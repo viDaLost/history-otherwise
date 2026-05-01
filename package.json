@@ -1,6 +1,6 @@
 {
-  "name": "history-otherwise-stable-json",
-  "version": "3.4.0",
+  "name": "inaya-history-progress-concrete",
+  "version": "4.0.0",
   "private": true,
   "type": "module",
   "scripts": {
