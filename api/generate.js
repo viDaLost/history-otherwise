@@ -8,85 +8,62 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY
 });
 
+const MODELS = [
+  "gemini-2.5-flash-lite",
+  "gemini-3.1-flash-lite-preview",
+  "gemini-flash-latest"
+];
+
 function cleanText(value) {
   if (typeof value !== "string") return "";
   return value.trim();
 }
 
 function toText(value) {
-  if (Array.isArray(value)) return value.filter(Boolean).join("\n\n");
+  if (Array.isArray(value)) return value.filter(Boolean).map(toText).join("\n\n");
   if (typeof value === "string") return value.trim();
-  if (value && typeof value === "object") return JSON.stringify(value, null, 2);
+  if (typeof value === "number") return String(value);
+  if (value && typeof value === "object") return Object.values(value).map(toText).filter(Boolean).join("\n\n");
   return "";
 }
 
-function normalizeResult(data) {
-  const result = data && typeof data === "object" ? data : {};
-
-  const after5Years = toText(result.after5Years || result.fiveYears || result.resultAfter5Years);
-  const after20Years = toText(result.after20Years || result.twentyYears || result.resultAfter20Years);
-  const after50Years = toText(result.after50Years || result.fiftyYears || result.resultAfter50Years);
-
+function getInput(body) {
   return {
-    title: toText(result.title),
-    shortSummary: toText(result.shortSummary),
-    realHistoryContext: toText(result.realHistoryContext),
-    changedPoint: toText(result.changedPoint),
-    firstConsequences: toText(result.firstConsequences),
-    causeChain: toText(result.causeChain),
-    politics: toText(result.politics),
-    economy: toText(result.economy),
-    military: toText(result.military),
-    technology: toText(result.technology),
-    culture: toText(result.culture),
-    society: toText(result.society),
-    bordersAndAlliances: toText(result.bordersAndAlliances),
-    ordinaryPeopleLife: toText(result.ordinaryPeopleLife),
-    after5Years,
-    after20Years,
-    after50Years,
-    fiveYears: after5Years,
-    twentyYears: after20Years,
-    fiftyYears: after50Years,
-    modernWorldResult: toText(result.modernWorldResult),
-    probabilityScore: Number(result.probabilityScore) || 50,
-    risks: toText(result.risks),
-    sourcesNote: toText(result.sourcesNote),
-    videoScriptVersion: toText(result.videoScriptVersion),
-    voiceoverVersion: toText(result.voiceoverVersion),
-    timeline: Array.isArray(result.timeline) ? result.timeline : [],
-    causeEffectMap: Array.isArray(result.causeEffectMap) ? result.causeEffectMap : []
+    eventTitle: cleanText(body.eventTitle || body.title || body.event || body.eventName || "Не указано"),
+    region: cleanText(body.region || body.country || body.place || "Не указано"),
+    period: cleanText(body.period || body.year || body.date || "Не указано"),
+    change: cleanText(body.change || body.mainChange || body.changedPoint || body.prompt || body.userPrompt || ""),
+    depth: cleanText(body.depth || body.analysisDepth || "Глубокий анализ"),
+    style: cleanText(body.style || body.answerStyle || "Документальный")
   };
 }
 
-function buildPrompt(body) {
-  const eventTitle = cleanText(body.eventTitle || body.title || body.event || "Не указано");
-  const region = cleanText(body.region || body.country || "Не указано");
-  const period = cleanText(body.period || body.year || body.date || "Не указано");
-  const change = cleanText(body.change || body.mainChange || body.prompt || "");
-  const depth = cleanText(body.depth || "Глубокий анализ");
-  const style = cleanText(body.style || "Документальный");
-
+function buildPrompt(input) {
   return `
-Создай альтернативную историю на русском языке.
+Ты исторический аналитик и сценарист альтернативной истории.
+
+Создай правдоподобную альтернативную ветку истории на русском языке.
 
 Данные пользователя:
-Событие: ${eventTitle}
-Регион: ${region}
-Период: ${period}
-Главное изменение: ${change}
-Глубина анализа: ${depth}
-Стиль: ${style}
+Событие: ${input.eventTitle}
+Регион: ${input.region}
+Период: ${input.period}
+Главное изменение: ${input.change}
+Глубина анализа: ${input.depth}
+Стиль: ${input.style}
 
-Правила:
-1. Отделяй реальные факты от предположений.
-2. Не выдавай выдуманные события за реальные.
-3. Покажи причинно-следственную логику.
-4. Заполни все поля JSON.
-5. Не оставляй пустые поля.
-6. probabilityScore дай числом от 1 до 100.
-7. timeline сделай из 8 пунктов.
-8. causeEffectMap сделай из 6 ветвей: политика, экономика, войны, технологии, культура, общество.
+Жёсткие правила:
+1. Верни только JSON по схеме.
+2. Заполни каждое поле.
+3. Не оставляй поля пустыми.
+4. Не пиши "нет данных".
+5. Отделяй реальные факты от предположений.
+6. Не выдавай выдуманные события за реальные.
+7. Покажи цепочку причин и последствий.
+8. timeline сделай из 8 пунктов.
+9. causeEffectMap сделай из 6 ветвей: политика, экономика, войны, технологии, культура, общество.
+10. probabilityScore дай числом от 1 до 100.
+11. Текст в каждом крупном поле сделай содержательным: 3–6 предложений.
 `;
 }
 
@@ -173,6 +150,192 @@ const responseSchema = {
   ]
 };
 
+function normalizeResult(data, input) {
+  const result = data && typeof data === "object" ? data : {};
+  const title = toText(result.title) || `Альтернативная история: ${input.eventTitle}`;
+  const shortSummary = toText(result.shortSummary) || `Сценарий строится вокруг изменения: ${input.change}`;
+
+  const after5Years = toText(result.after5Years || result.fiveYears || result.resultAfter5Years);
+  const after20Years = toText(result.after20Years || result.twentyYears || result.resultAfter20Years);
+  const after50Years = toText(result.after50Years || result.fiftyYears || result.resultAfter50Years);
+
+  return {
+    title,
+    shortSummary,
+    realHistoryContext: toText(result.realHistoryContext),
+    changedPoint: toText(result.changedPoint) || input.change,
+    firstConsequences: toText(result.firstConsequences),
+    causeChain: toText(result.causeChain),
+    politics: toText(result.politics),
+    economy: toText(result.economy),
+    military: toText(result.military),
+    technology: toText(result.technology),
+    culture: toText(result.culture),
+    society: toText(result.society),
+    bordersAndAlliances: toText(result.bordersAndAlliances),
+    ordinaryPeopleLife: toText(result.ordinaryPeopleLife),
+    after5Years,
+    after20Years,
+    after50Years,
+    fiveYears: after5Years,
+    twentyYears: after20Years,
+    fiftyYears: after50Years,
+    modernWorldResult: toText(result.modernWorldResult),
+    probabilityScore: Math.max(1, Math.min(100, Number(result.probabilityScore) || 50)),
+    risks: toText(result.risks),
+    sourcesNote: toText(result.sourcesNote),
+    videoScriptVersion: toText(result.videoScriptVersion),
+    voiceoverVersion: toText(result.voiceoverVersion),
+    timeline: Array.isArray(result.timeline) ? result.timeline : [],
+    causeEffectMap: Array.isArray(result.causeEffectMap) ? result.causeEffectMap : []
+  };
+}
+
+function resultToText(result) {
+  const timeline = Array.isArray(result.timeline)
+    ? result.timeline.map((item) => `${item.year}. ${item.title}\n${item.description}\nВлияние: ${item.impactLevel}`).join("\n\n")
+    : "";
+
+  const map = Array.isArray(result.causeEffectMap)
+    ? result.causeEffectMap.map((branch) => `${branch.branch}\n${Array.isArray(branch.items) ? branch.items.map((x) => `- ${x}`).join("\n") : ""}`).join("\n\n")
+    : "";
+
+  return [
+    result.title,
+    "",
+    "Краткое резюме",
+    result.shortSummary,
+    "",
+    "Реальный исторический контекст",
+    result.realHistoryContext,
+    "",
+    "Что изменилось",
+    result.changedPoint,
+    "",
+    "Первые последствия",
+    result.firstConsequences,
+    "",
+    "Цепочка последствий",
+    result.causeChain,
+    "",
+    "Политические последствия",
+    result.politics,
+    "",
+    "Экономические последствия",
+    result.economy,
+    "",
+    "Военные последствия",
+    result.military,
+    "",
+    "Технологические последствия",
+    result.technology,
+    "",
+    "Культурные последствия",
+    result.culture,
+    "",
+    "Границы и союзы",
+    result.bordersAndAlliances,
+    "",
+    "Жизнь обычных людей",
+    result.ordinaryPeopleLife,
+    "",
+    "Через 5 лет",
+    result.after5Years,
+    "",
+    "Через 20 лет",
+    result.after20Years,
+    "",
+    "Через 50 лет",
+    result.after50Years,
+    "",
+    "Современный мир",
+    result.modernWorldResult,
+    "",
+    `Правдоподобность: ${result.probabilityScore} из 100`,
+    "",
+    "Риски сценария",
+    result.risks,
+    "",
+    "Временная линия",
+    timeline,
+    "",
+    "Карта причин и последствий",
+    map,
+    "",
+    "Версия для YouTube",
+    result.videoScriptVersion,
+    "",
+    "Версия для озвучки",
+    result.voiceoverVersion,
+    "",
+    "Примечание",
+    result.sourcesNote
+  ].filter((part) => part !== undefined && part !== null).join("\n");
+}
+
+function parseGeminiError(error) {
+  const raw = error?.message || "Ошибка генерации через Gemini API.";
+  try {
+    const start = raw.indexOf("{");
+    if (start >= 0) {
+      const parsed = JSON.parse(raw.slice(start));
+      return parsed?.error?.message || raw;
+    }
+  } catch {}
+  return raw;
+}
+
+function isTemporaryError(message) {
+  const text = String(message || "").toLowerCase();
+  return text.includes("503") ||
+    text.includes("unavailable") ||
+    text.includes("high demand") ||
+    text.includes("temporarily") ||
+    text.includes("overloaded") ||
+    text.includes("rate") ||
+    text.includes("429");
+}
+
+async function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function generateWithFallback(prompt) {
+  let lastError = "";
+
+  for (const model of MODELS) {
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            temperature: 0.6,
+            maxOutputTokens: 4096,
+            responseMimeType: "application/json",
+            responseSchema
+          }
+        });
+
+        return {
+          model,
+          text: response.text || "{}"
+        };
+      } catch (error) {
+        lastError = parseGeminiError(error);
+
+        if (!isTemporaryError(lastError)) {
+          throw new Error(lastError);
+        }
+
+        await wait(700 * attempt);
+      }
+    }
+  }
+
+  throw new Error(lastError || "Модель Gemini перегружена. Попробуй позже.");
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({
@@ -188,50 +351,50 @@ export default async function handler(req, res) {
     }
 
     const body = req.body || {};
-    const change = cleanText(body.change || body.mainChange || body.prompt || "");
+    const input = getInput(body);
 
-    if (change.length < 10) {
+    if (input.change.length < 10) {
       return res.status(400).json({
         error: "Опиши главное изменение подробнее. Нужно минимум 10 символов."
       });
     }
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-lite",
-      contents: buildPrompt(body),
-      config: {
-        temperature: 0.65,
-        maxOutputTokens: 4096,
-        responseMimeType: "application/json",
-        responseSchema
-      }
-    });
-
-    let parsed;
-
-    try {
-      parsed = JSON.parse(response.text || "{}");
-    } catch {
-      return res.status(500).json({
-        error: "Gemini вернул не JSON. Попробуй ещё раз или уменьши запрос."
+    if (input.change.length > 3000) {
+      return res.status(400).json({
+        error: "Текст слишком длинный. Сократи описание изменения до 3000 символов."
       });
     }
 
-    return res.status(200).json(normalizeResult(parsed));
-  } catch (error) {
-    const rawMessage = error?.message || "Ошибка генерации через Gemini API.";
-    let message = rawMessage;
+    const generated = await generateWithFallback(buildPrompt(input));
 
+    let parsed;
     try {
-      const jsonStart = rawMessage.indexOf("{");
-      if (jsonStart >= 0) {
-        const parsedError = JSON.parse(rawMessage.slice(jsonStart));
-        message = parsedError?.error?.message || rawMessage;
-      }
-    } catch {}
+      parsed = JSON.parse(generated.text);
+    } catch {
+      return res.status(500).json({
+        error: "Gemini вернул ответ не в формате JSON. Нажми кнопку генерации ещё раз."
+      });
+    }
 
+    const normalized = normalizeResult(parsed, input);
+    const text = resultToText(normalized);
+
+    return res.status(200).json({
+      ok: true,
+      model: generated.model,
+
+      // Для твоего текущего frontend.
+      result: normalized,
+
+      // Для старых версий frontend, которые ждут текст.
+      resultText: text,
+
+      // Для версий frontend, которые читают поля напрямую.
+      ...normalized
+    });
+  } catch (error) {
     return res.status(500).json({
-      error: message
+      error: parseGeminiError(error)
     });
   }
 }
