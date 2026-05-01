@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Modality } from "@google/genai";
 
 export const config = {
   maxDuration: 60
@@ -34,13 +34,13 @@ function buildIllustrationPrompt(payload) {
   const region = crop(payload.region, 120);
 
   return `
-Create one cinematic alternative history illustration for a mobile app.
+Create one cinematic alternative history illustration for a mobile web app.
 
-Main goal:
-Show the overall new world after the user's historical change.
-The viewer must understand how politics, society, economy, military balance, technology, and daily life changed.
+Goal:
+Show the overall changed world after the user's historical change.
+The viewer should understand how politics, society, economy, military balance, technology, and daily life changed.
 
-Scenario title:
+Scenario:
 ${title}
 
 Region:
@@ -84,6 +84,7 @@ deep perspective,
 rich environment detail,
 dramatic lighting,
 premium mobile app illustration,
+historically grounded,
 no text,
 no letters,
 no readable signs,
@@ -94,8 +95,8 @@ no UI.
 
 Composition:
 foreground: ordinary people and signs of changed daily life,
-middle ground: government, army, industry, protests, institutions, or public order,
-background: city, architecture, state symbols without readable text, scale of historical change.
+middle ground: government, army, industry, public order, institutions, or social change,
+background: city, architecture, state symbols without readable text, and large-scale consequences.
 `;
 }
 
@@ -112,7 +113,7 @@ function parseGeminiError(error) {
 }
 
 function getParts(response) {
-  return response?.candidates?.[0]?.content?.parts || [];
+  return response?.candidates?.[0]?.content?.parts || response?.parts || [];
 }
 
 function extractImage(parts) {
@@ -139,42 +140,70 @@ function extractText(parts) {
     .trim();
 }
 
+async function tryModel(model, prompt, config) {
+  const response = await ai.models.generateContent({
+    model,
+    contents: prompt,
+    config
+  });
+
+  const parts = getParts(response);
+  const imageUrl = extractImage(parts);
+
+  if (imageUrl) {
+    return {
+      model,
+      imageUrl
+    };
+  }
+
+  const text = extractText(parts);
+  throw new Error(text || `Модель ${model} ответила без изображения.`);
+}
+
 async function generateGeminiImage(prompt) {
-  const models = [
-    "gemini-2.5-flash-image",
-    "gemini-2.0-flash-preview-image-generation"
+  const attempts = [
+    {
+      model: "gemini-2.5-flash-image",
+      config: {
+        responseModalities: [Modality.TEXT, Modality.IMAGE],
+        imageConfig: {
+          aspectRatio: "1:1"
+        }
+      }
+    },
+    {
+      model: "gemini-2.5-flash-image-preview",
+      config: {
+        responseModalities: [Modality.TEXT, Modality.IMAGE],
+        imageConfig: {
+          aspectRatio: "1:1"
+        }
+      }
+    },
+    {
+      model: "gemini-3-pro-image-preview",
+      config: {
+        responseModalities: [Modality.TEXT, Modality.IMAGE],
+        imageConfig: {
+          aspectRatio: "1:1",
+          imageSize: "1K"
+        }
+      }
+    }
   ];
 
-  let lastError = "";
+  const errors = [];
 
-  for (const model of models) {
+  for (const attempt of attempts) {
     try {
-      const response = await ai.models.generateContent({
-        model,
-        contents: prompt,
-        config: {
-          responseModalities: ["Image"]
-        }
-      });
-
-      const parts = getParts(response);
-      const imageUrl = extractImage(parts);
-
-      if (imageUrl) {
-        return {
-          model,
-          imageUrl
-        };
-      }
-
-      const text = extractText(parts);
-      lastError = text || `Модель ${model} ответила без изображения.`;
+      return await tryModel(attempt.model, prompt, attempt.config);
     } catch (error) {
-      lastError = parseGeminiError(error);
+      errors.push(`${attempt.model}: ${parseGeminiError(error)}`);
     }
   }
 
-  throw new Error(lastError || "Gemini не вернул изображение.");
+  throw new Error(errors.join("\n\n"));
 }
 
 export default async function handler(req, res) {
