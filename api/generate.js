@@ -38,35 +38,6 @@ function getInput(body) {
   };
 }
 
-function buildPrompt(input) {
-  return `
-Ты исторический аналитик, редактор и сценарист альтернативной истории.
-
-Создай правдоподобную альтернативную ветку истории на русском языке.
-
-Данные пользователя:
-Событие: ${input.eventTitle}
-Регион: ${input.region}
-Период: ${input.period}
-Главное изменение: ${input.change}
-Глубина анализа: ${input.depth}
-Стиль: ${input.style}
-
-Жёсткие правила:
-1. Верни только JSON по схеме.
-2. Заполни каждое поле. Нельзя писать пустые строки и "нет данных".
-3. Каждое крупное поле должно содержать 2–4 конкретных предложения.
-4. Отделяй реальные факты от предположений.
-5. Не выдавай выдуманные события за реальные.
-6. Покажи понятную цепочку причин и последствий.
-7. timeline сделай из 6–8 пунктов.
-8. causeEffectMap сделай из 6 ветвей: политика, экономика, войны, технологии, культура, общество.
-9. probabilityScore дай числом от 1 до 100.
-10. Не растягивай ответ. Пиши плотно, ясно и полезно.
-11. Все impactLevel пиши на русском: высокий, средний, низкий.
-`;
-}
-
 const responseSchema = {
   type: Type.OBJECT,
   properties: {
@@ -102,8 +73,7 @@ const responseSchema = {
           title: { type: Type.STRING },
           description: { type: Type.STRING },
           impactLevel: { type: Type.STRING }
-        },
-        required: ["year", "title", "description", "impactLevel"]
+        }
       }
     },
     causeEffectMap: {
@@ -116,275 +86,53 @@ const responseSchema = {
             type: Type.ARRAY,
             items: { type: Type.STRING }
           }
-        },
-        required: ["branch", "items"]
+        }
       }
     }
-  },
-  required: [
-    "title",
-    "shortSummary",
-    "realHistoryContext",
-    "changedPoint",
-    "firstConsequences",
-    "causeChain",
-    "politics",
-    "economy",
-    "military",
-    "technology",
-    "culture",
-    "society",
-    "bordersAndAlliances",
-    "ordinaryPeopleLife",
-    "after5Years",
-    "after20Years",
-    "after50Years",
-    "modernWorldResult",
-    "probabilityScore",
-    "risks",
-    "sourcesNote",
-    "videoScriptVersion",
-    "voiceoverVersion",
-    "timeline",
-    "causeEffectMap"
-  ]
+  }
 };
 
-function findBranch(map, words) {
-  if (!Array.isArray(map)) return "";
-  const item = map.find((branch) => {
-    const name = toText(branch?.branch).toLowerCase();
-    return words.some((word) => name.includes(word));
-  });
+function buildPrompt(input) {
+  return `
+Ты исторический аналитик и редактор альтернативной истории.
 
-  if (!item || !Array.isArray(item.items)) return "";
-  return item.items.filter(Boolean).map((x) => `• ${toText(x)}`).join("\n");
-}
+Создай правдоподобную альтернативную ветку истории на русском языке.
 
-function fallbackText(input, section) {
-  const base = input.change || "заданное пользователем изменение";
-  const event = input.eventTitle || "историческое событие";
+Данные пользователя:
+Событие: ${input.eventTitle}
+Регион: ${input.region}
+Период: ${input.period}
+Главное изменение: ${input.change}
+Глубина анализа: ${input.depth}
+Стиль: ${input.style}
 
-  const map = {
-    realHistoryContext: `В реальной истории событие «${event}» развивалось в рамках своего политического и социального контекста. Альтернативный сценарий меняет одну ключевую точку и дальше строит последствия как предположение, а не как реальный факт.`,
-    changedPoint: `Ключевое изменение: ${base}. Именно оно запускает новую цепочку решений, конфликтов и компромиссов.`,
-    firstConsequences: `Первые последствия затрагивают власть, общественные настроения и баланс сил. Участники событий вынуждены менять планы, искать союзников и быстро реагировать на новую ситуацию.`,
-    causeChain: `Главное изменение влияет на ближайшие политические решения. Эти решения меняют экономику, безопасность, внешние союзы и жизнь обычных людей.`,
-    politics: `Политическая система меняется из-за нового баланса сил. Власть ищет способы удержать контроль и снизить риск нового кризиса.`,
-    economy: `Экономика реагирует на политическую неопределённость. Государство усиливает контроль над ключевыми ресурсами и пытается сохранить производство.`,
-    military: `Военная сфера становится одним из главных инструментов стабилизации. Армия получает больше влияния, потому что от неё зависит исход кризиса.`,
-    technology: `Технологическое развитие идёт через потребности государства, армии и промышленности. Часть проектов получает больше ресурсов, а часть замедляется.`,
-    culture: `Культура отражает новый политический курс. Общество спорит о прошлом, власти и будущем страны.`,
-    society: `Общество делится на сторонников нового порядка и тех, кто считает его опасным. Повседневная жизнь становится осторожнее и политически напряжённее.`,
-    bordersAndAlliances: `Границы и союзы меняются не сразу. Сначала меняется дипломатическая позиция страны, затем вокруг неё формируются новые партнёрства и конфликты.`,
-    ordinaryPeopleLife: `Обычные люди живут в условиях неопределённости. Работа, цены, безопасность и свобода слова зависят от того, как новая власть удерживает ситуацию.`,
-    after5Years: `Через 5 лет последствия уже закрепляются в институтах. Страна получает новый политический курс, но внутреннее напряжение сохраняется.`,
-    after20Years: `Через 20 лет альтернативный путь меняет поколение, экономику и международную роль страны. Часть проблем решена, но появляются новые противоречия.`,
-    after50Years: `Через 50 лет последствия становятся частью новой исторической нормы. Мир воспринимает эту версию событий как базовую, хотя её слабые места остаются заметными.`,
-    modernWorldResult: `Современный мир в этой версии истории отличается балансом сил, союзами и памятью о прошлом. Главное изменение влияет на международные блоки, экономические связи и культурную идентичность.`,
-    risks: `Главные риски сценария: слишком сильная роль отдельных лидеров, сопротивление общества, экономическое давление и вмешательство внешних сил.`,
-    sourcesNote: `Это альтернативная реконструкция. Реальные факты использованы как исходная точка, дальнейшие события являются логическим предположением.`
-  };
+Верни только JSON.
+Не используй markdown.
+Не используй блоки кода.
+Не добавляй пояснения вне JSON.
+Не оставляй пустые поля.
+Не пиши "нет данных".
+Если данные пользователя противоречивые, всё равно построй сценарий и объясни спорность в risks и sourcesNote.
 
-  return map[section] || "";
-}
-
-function normalizeTimeline(timeline, input) {
-  if (Array.isArray(timeline) && timeline.length) {
-    return timeline.slice(0, 8).map((item, index) => ({
-      year: toText(item.year) || String(index + 1),
-      title: toText(item.title) || "Событие",
-      description: toText(item.description) || fallbackText(input, "firstConsequences"),
-      impactLevel: toText(item.impactLevel) || "средний"
-    }));
-  }
-
-  return [
-    {
-      year: input.period || "Начало",
-      title: "Точка изменения",
-      description: input.change,
-      impactLevel: "высокий"
-    },
-    {
-      year: "+1 год",
-      title: "Первые последствия",
-      description: fallbackText(input, "firstConsequences"),
-      impactLevel: "высокий"
-    },
-    {
-      year: "+5 лет",
-      title: "Закрепление нового курса",
-      description: fallbackText(input, "after5Years"),
-      impactLevel: "средний"
-    },
-    {
-      year: "+20 лет",
-      title: "Новая система",
-      description: fallbackText(input, "after20Years"),
-      impactLevel: "средний"
-    }
-  ];
-}
-
-function normalizeMap(map, input, result) {
-  const branches = ["Политика", "Экономика", "Войны", "Технологии", "Культура", "Общество"];
-
-  return branches.map((branch) => {
-    const existing = Array.isArray(map)
-      ? map.find((item) => toText(item.branch).toLowerCase().includes(branch.toLowerCase().slice(0, 5)))
-      : null;
-
-    if (existing && Array.isArray(existing.items) && existing.items.length) {
-      return {
-        branch,
-        items: existing.items.map(toText).filter(Boolean).slice(0, 6)
-      };
-    }
-
-    const key = {
-      "Политика": "politics",
-      "Экономика": "economy",
-      "Войны": "military",
-      "Технологии": "technology",
-      "Культура": "culture",
-      "Общество": "society"
-    }[branch];
-
-    const text = toText(result[key]) || fallbackText(input, key);
-    return {
-      branch,
-      items: text.split(/[.!?]\s+/).map((x) => x.trim()).filter(Boolean).slice(0, 4)
-    };
-  });
-}
-
-function normalizeResult(data, input) {
-  const raw = data && typeof data === "object" ? data : {};
-  const causeEffectMapRaw = Array.isArray(raw.causeEffectMap) ? raw.causeEffectMap : [];
-
-  const result = {
-    title: toText(raw.title) || `Альтернативная история: ${input.eventTitle}`,
-    shortSummary: toText(raw.shortSummary) || `Сценарий строится вокруг изменения: ${input.change}`,
-    realHistoryContext: toText(raw.realHistoryContext) || fallbackText(input, "realHistoryContext"),
-    changedPoint: toText(raw.changedPoint) || fallbackText(input, "changedPoint"),
-    firstConsequences: toText(raw.firstConsequences) || fallbackText(input, "firstConsequences"),
-    causeChain: toText(raw.causeChain) || findBranch(causeEffectMapRaw, ["прич", "цеп"]) || fallbackText(input, "causeChain"),
-    politics: toText(raw.politics) || findBranch(causeEffectMapRaw, ["полит"]) || fallbackText(input, "politics"),
-    economy: toText(raw.economy) || findBranch(causeEffectMapRaw, ["эконом"]) || fallbackText(input, "economy"),
-    military: toText(raw.military) || findBranch(causeEffectMapRaw, ["войн", "арм", "воен"]) || fallbackText(input, "military"),
-    technology: toText(raw.technology) || findBranch(causeEffectMapRaw, ["техн"]) || fallbackText(input, "technology"),
-    culture: toText(raw.culture) || findBranch(causeEffectMapRaw, ["культ"]) || fallbackText(input, "culture"),
-    society: toText(raw.society) || findBranch(causeEffectMapRaw, ["общ", "соци"]) || fallbackText(input, "society"),
-    bordersAndAlliances: toText(raw.bordersAndAlliances) || fallbackText(input, "bordersAndAlliances"),
-    ordinaryPeopleLife: toText(raw.ordinaryPeopleLife) || fallbackText(input, "ordinaryPeopleLife"),
-    after5Years: toText(raw.after5Years || raw.fiveYears || raw.resultAfter5Years) || fallbackText(input, "after5Years"),
-    after20Years: toText(raw.after20Years || raw.twentyYears || raw.resultAfter20Years) || fallbackText(input, "after20Years"),
-    after50Years: toText(raw.after50Years || raw.fiftyYears || raw.resultAfter50Years) || fallbackText(input, "after50Years"),
-    modernWorldResult: toText(raw.modernWorldResult) || fallbackText(input, "modernWorldResult"),
-    probabilityScore: Math.max(1, Math.min(100, Number(raw.probabilityScore) || 65)),
-    risks: toText(raw.risks) || fallbackText(input, "risks"),
-    sourcesNote: toText(raw.sourcesNote) || fallbackText(input, "sourcesNote"),
-    videoScriptVersion: toText(raw.videoScriptVersion) || `В этой версии истории всё меняется в момент, когда ${input.change}. Сначала меняется баланс власти, затем экономика, армия и жизнь общества. Через годы это приводит к другой политической карте и новому месту страны в мире.`,
-    voiceoverVersion: toText(raw.voiceoverVersion) || `Представь, что ${input.change}. Первый эффект заметен сразу: меняется власть, общество и ход будущих решений. Дальше эта точка создаёт новую ветку истории, где привычный мир развивается иначе.`
-  };
-
-  result.fiveYears = result.after5Years;
-  result.twentyYears = result.after20Years;
-  result.fiftyYears = result.after50Years;
-  result.timeline = normalizeTimeline(raw.timeline, input);
-  result.causeEffectMap = normalizeMap(raw.causeEffectMap, input, result);
-
-  result.politicalConsequences = result.politics;
-  result.economicConsequences = result.economy;
-  result.militaryConsequences = result.military;
-  result.technologyConsequences = result.technology;
-  result.culturalConsequences = result.culture;
-  result.socialConsequences = result.society;
-  result.chainOfConsequences = result.causeChain;
-
-  return result;
-}
-
-function resultToText(result) {
-  const timeline = result.timeline.map((item) => `${item.year}. ${item.title}\n${item.description}\nВлияние: ${item.impactLevel}`).join("\n\n");
-
-  const map = result.causeEffectMap.map((branch) => `${branch.branch}\n${branch.items.map((x) => `• ${x}`).join("\n")}`).join("\n\n");
-
-  return [
-    result.title,
-    "",
-    "Краткое резюме",
-    result.shortSummary,
-    "",
-    "Реальный исторический контекст",
-    result.realHistoryContext,
-    "",
-    "Что изменилось",
-    result.changedPoint,
-    "",
-    "Первые последствия",
-    result.firstConsequences,
-    "",
-    "Цепочка последствий",
-    result.causeChain,
-    "",
-    "Политические последствия",
-    result.politics,
-    "",
-    "Экономические последствия",
-    result.economy,
-    "",
-    "Военные последствия",
-    result.military,
-    "",
-    "Технологические последствия",
-    result.technology,
-    "",
-    "Культурные последствия",
-    result.culture,
-    "",
-    "Общество",
-    result.society,
-    "",
-    "Границы и союзы",
-    result.bordersAndAlliances,
-    "",
-    "Жизнь обычных людей",
-    result.ordinaryPeopleLife,
-    "",
-    "Через 5 лет",
-    result.after5Years,
-    "",
-    "Через 20 лет",
-    result.after20Years,
-    "",
-    "Через 50 лет",
-    result.after50Years,
-    "",
-    "Современный мир",
-    result.modernWorldResult,
-    "",
-    `Правдоподобность: ${result.probabilityScore} из 100`,
-    "",
-    "Риски сценария",
-    result.risks,
-    "",
-    "Временная линия",
-    timeline,
-    "",
-    "Карта причин и последствий",
-    map,
-    "",
-    "Версия для YouTube",
-    result.videoScriptVersion,
-    "",
-    "Версия для озвучки",
-    result.voiceoverVersion,
-    "",
-    "Примечание",
-    result.sourcesNote
-  ].join("\n");
+Требования:
+- title: короткое название сценария.
+- shortSummary: 2-3 предложения.
+- realHistoryContext: 2-4 предложения.
+- changedPoint: 2-4 предложения.
+- firstConsequences: 2-4 предложения.
+- causeChain: 2-4 предложения.
+- politics, economy, military, technology, culture, society: 2-4 предложения в каждом поле.
+- bordersAndAlliances: 2-4 предложения.
+- ordinaryPeopleLife: 2-4 предложения.
+- after5Years, after20Years, after50Years, modernWorldResult: 2-4 предложения в каждом поле.
+- probabilityScore: число от 1 до 100.
+- risks: 2-4 предложения.
+- sourcesNote: 1-3 предложения.
+- videoScriptVersion: краткая версия для видео.
+- voiceoverVersion: версия для озвучки.
+- timeline: 6-8 объектов.
+- causeEffectMap: 6 ветвей: политика, экономика, войны, технологии, культура, общество.
+`;
 }
 
 function parseGeminiError(error) {
@@ -399,6 +147,35 @@ function parseGeminiError(error) {
   return raw;
 }
 
+function parseLooseJson(text) {
+  if (!text) return null;
+
+  let raw = String(text).trim();
+
+  raw = raw
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/```$/i, "")
+    .trim();
+
+  try {
+    return JSON.parse(raw);
+  } catch {}
+
+  const firstBrace = raw.indexOf("{");
+  const lastBrace = raw.lastIndexOf("}");
+
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    const slice = raw.slice(firstBrace, lastBrace + 1);
+
+    try {
+      return JSON.parse(slice);
+    } catch {}
+  }
+
+  return null;
+}
+
 function isTemporaryError(message) {
   const text = String(message || "").toLowerCase();
   return text.includes("503") ||
@@ -410,30 +187,37 @@ function isTemporaryError(message) {
     text.includes("rate");
 }
 
-async function wait(ms) {
+function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function generateWithFallback(prompt) {
+async function callGemini(prompt, useSchema = true) {
   let lastError = "";
 
   for (const model of MODELS) {
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
+        const config = useSchema
+          ? {
+              temperature: 0.35,
+              maxOutputTokens: 4096,
+              responseMimeType: "application/json",
+              responseSchema
+            }
+          : {
+              temperature: 0.25,
+              maxOutputTokens: 4096
+            };
+
         const response = await ai.models.generateContent({
           model,
           contents: prompt,
-          config: {
-            temperature: 0.6,
-            maxOutputTokens: 4096,
-            responseMimeType: "application/json",
-            responseSchema
-          }
+          config
         });
 
         return {
           model,
-          text: response.text || "{}"
+          text: response.text || ""
         };
       } catch (error) {
         lastError = parseGeminiError(error);
@@ -442,12 +226,184 @@ async function generateWithFallback(prompt) {
           throw new Error(lastError);
         }
 
-        await wait(700 * attempt);
+        await wait(650 * attempt);
       }
     }
   }
 
-  throw new Error(lastError || "Модель Gemini перегружена. Попробуй позже.");
+  throw new Error(lastError || "Gemini временно перегружен. Попробуй ещё раз.");
+}
+
+async function convertTextToJson(text, input) {
+  const prompt = `
+Преобразуй текст ниже в валидный JSON для приложения альтернативной истории.
+
+Верни только JSON.
+Не используй markdown.
+Не используй блоки кода.
+Не добавляй текст вне JSON.
+
+Если в тексте не хватает данных, заполни их логично на основе данных пользователя.
+
+Данные пользователя:
+Событие: ${input.eventTitle}
+Регион: ${input.region}
+Период: ${input.period}
+Главное изменение: ${input.change}
+
+Текст:
+${String(text).slice(0, 6000)}
+`;
+
+  const generated = await callGemini(prompt, true);
+  return parseLooseJson(generated.text);
+}
+
+function fallbackText(input, section) {
+  const event = input.eventTitle || "историческое событие";
+  const change = input.change || "заданное изменение";
+
+  const table = {
+    realHistoryContext: `В реальной истории событие «${event}» развивалось в конкретном политическом и социальном контексте. Альтернативный сценарий меняет одну ключевую точку и показывает логические последствия этого изменения.`,
+    changedPoint: `Ключевое изменение состоит в том, что ${change}. Это меняет баланс сил, решения элит и реакцию общества.`,
+    firstConsequences: `Первые последствия затрагивают власть, общественные настроения и устойчивость государства. Участники событий быстро перестраивают свои действия, потому что исходная траектория истории нарушена.`,
+    causeChain: `Сначала меняется точка принятия решений. Затем меняются политический курс, экономические приоритеты, международные отношения и повседневная жизнь людей.`,
+    politics: `Политическая система перестраивается под новый баланс сил. Власть усиливает контроль над ключевыми институтами и пытается закрепить новый курс.`,
+    economy: `Экономика реагирует на политическую перестройку и новые решения государства. Меняются правила собственности, распределения ресурсов и внешней торговли.`,
+    military: `Военная сфера становится опорой для стабилизации или давления. Армия получает более заметную роль, потому что от неё зависит безопасность нового режима.`,
+    technology: `Технологическое развитие подстраивается под новые приоритеты страны. Одни направления ускоряются, а другие получают меньше ресурсов.`,
+    culture: `Культура отражает новую идеологию и спор о будущем. Через прессу, искусство, образование и публичную память общество переосмысливает произошедшее.`,
+    society: `Общество делится на сторонников нового курса и его критиков. Повседневная жизнь меняется через новые правила, ожидания и уровень свободы.`,
+    bordersAndAlliances: `Границы и союзы меняются по мере того, как страна ищет новые договорённости и сталкивается с внешним давлением. Дипломатия становится инструментом закрепления новой линии развития.`,
+    ordinaryPeopleLife: `Жизнь обычных людей меняется через работу, цены, безопасность, доступ к информации и отношение государства к населению. Новая историческая ветка влияет на быт сильнее, чем кажется на первом этапе.`,
+    after5Years: `Через 5 лет новое направление уже видно в институтах, экономике и политике. При этом часть кризисов ещё не решена и продолжает влиять на общество.`,
+    after20Years: `Через 20 лет альтернативный курс меняет целое поколение. Государство, экономика и международная роль страны становятся заметно другими.`,
+    after50Years: `Через 50 лет последствия превращаются в новую историческую норму. Мир воспринимает этот путь как базовый, хотя у него остаются собственные слабые места.`,
+    modernWorldResult: `Современный мир в этой версии истории отличается иным балансом сил, другими союзами и новой памятью о прошлом. Изменение одной точки отражается на международной политике, экономике и культуре.`,
+    risks: `Главные риски сценария связаны с сопротивлением общества, внешним давлением, экономическими сбоями и тем, что отдельные решения могли пойти по другому пути.`,
+    sourcesNote: `Это альтернативная реконструкция. Реальные исторические факты взяты как исходная точка, а дальнейшие события являются логическим предположением.`,
+    videoScriptVersion: `Представь, что ${change}. Именно эта точка запускает новую ветку истории. Дальше меняются власть, экономика, общество и место страны в мире.`,
+    voiceoverVersion: `Представь, что ${change}. Сначала это меняет ближайшие решения власти. Затем новая траектория истории влияет на общество, внешнюю политику и будущее страны.`
+  };
+
+  return table[section] || "";
+}
+
+function normalizeTimeline(timeline, input, result) {
+  if (Array.isArray(timeline) && timeline.length) {
+    return timeline.slice(0, 8).map((item, index) => ({
+      year: toText(item.year) || String(index + 1),
+      title: toText(item.title) || "Событие",
+      description: toText(item.description) || fallbackText(input, "firstConsequences"),
+      impactLevel: toText(item.impactLevel) || "средний"
+    }));
+  }
+
+  return [
+    {
+      year: input.period || "Старт",
+      title: "Точка изменения",
+      description: result.changedPoint,
+      impactLevel: "высокий"
+    },
+    {
+      year: "+1 год",
+      title: "Первые последствия",
+      description: result.firstConsequences,
+      impactLevel: "высокий"
+    },
+    {
+      year: "+5 лет",
+      title: "Закрепление нового курса",
+      description: result.after5Years,
+      impactLevel: "средний"
+    },
+    {
+      year: "+20 лет",
+      title: "Новая долгосрочная система",
+      description: result.after20Years,
+      impactLevel: "средний"
+    }
+  ];
+}
+
+function normalizeMap(map, input, result) {
+  const branches = [
+    ["Политика", result.politics],
+    ["Экономика", result.economy],
+    ["Войны", result.military],
+    ["Технологии", result.technology],
+    ["Культура", result.culture],
+    ["Общество", result.society]
+  ];
+
+  return branches.map(([branch, fallback]) => {
+    const existing = Array.isArray(map)
+      ? map.find((item) => toText(item.branch).toLowerCase().includes(branch.toLowerCase().slice(0, 5)))
+      : null;
+
+    if (existing && Array.isArray(existing.items) && existing.items.length) {
+      return {
+        branch,
+        items: existing.items.map(toText).filter(Boolean).slice(0, 6)
+      };
+    }
+
+    return {
+      branch,
+      items: toText(fallback)
+        .split(/[.!?]\s+/)
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .slice(0, 4)
+    };
+  });
+}
+
+function normalizeResult(data, input) {
+  const raw = data && typeof data === "object" ? data : {};
+
+  const result = {
+    title: toText(raw.title) || `Альтернативная история: ${input.eventTitle}`,
+    shortSummary: toText(raw.shortSummary) || `Сценарий строится вокруг изменения: ${input.change}`,
+    realHistoryContext: toText(raw.realHistoryContext) || fallbackText(input, "realHistoryContext"),
+    changedPoint: toText(raw.changedPoint) || fallbackText(input, "changedPoint"),
+    firstConsequences: toText(raw.firstConsequences) || fallbackText(input, "firstConsequences"),
+    causeChain: toText(raw.causeChain) || fallbackText(input, "causeChain"),
+    politics: toText(raw.politics) || fallbackText(input, "politics"),
+    economy: toText(raw.economy) || fallbackText(input, "economy"),
+    military: toText(raw.military) || fallbackText(input, "military"),
+    technology: toText(raw.technology) || fallbackText(input, "technology"),
+    culture: toText(raw.culture) || fallbackText(input, "culture"),
+    society: toText(raw.society) || fallbackText(input, "society"),
+    bordersAndAlliances: toText(raw.bordersAndAlliances) || fallbackText(input, "bordersAndAlliances"),
+    ordinaryPeopleLife: toText(raw.ordinaryPeopleLife) || fallbackText(input, "ordinaryPeopleLife"),
+    after5Years: toText(raw.after5Years || raw.fiveYears) || fallbackText(input, "after5Years"),
+    after20Years: toText(raw.after20Years || raw.twentyYears) || fallbackText(input, "after20Years"),
+    after50Years: toText(raw.after50Years || raw.fiftyYears) || fallbackText(input, "after50Years"),
+    modernWorldResult: toText(raw.modernWorldResult) || fallbackText(input, "modernWorldResult"),
+    probabilityScore: Math.max(1, Math.min(100, Number(raw.probabilityScore) || 65)),
+    risks: toText(raw.risks) || fallbackText(input, "risks"),
+    sourcesNote: toText(raw.sourcesNote) || fallbackText(input, "sourcesNote"),
+    videoScriptVersion: toText(raw.videoScriptVersion) || fallbackText(input, "videoScriptVersion"),
+    voiceoverVersion: toText(raw.voiceoverVersion) || fallbackText(input, "voiceoverVersion")
+  };
+
+  result.fiveYears = result.after5Years;
+  result.twentyYears = result.after20Years;
+  result.fiftyYears = result.after50Years;
+  result.timeline = normalizeTimeline(raw.timeline, input, result);
+  result.causeEffectMap = normalizeMap(raw.causeEffectMap, input, result);
+
+  result.politicalConsequences = result.politics;
+  result.economicConsequences = result.economy;
+  result.militaryConsequences = result.military;
+  result.technologyConsequences = result.technology;
+  result.culturalConsequences = result.culture;
+  result.socialConsequences = result.society;
+  result.chainOfConsequences = result.causeChain;
+
+  return result;
 }
 
 export default async function handler(req, res) {
@@ -479,25 +435,32 @@ export default async function handler(req, res) {
       });
     }
 
-    const generated = await generateWithFallback(buildPrompt(input));
+    const generated = await callGemini(buildPrompt(input), true);
 
-    let parsed;
-    try {
-      parsed = JSON.parse(generated.text);
-    } catch {
-      return res.status(500).json({
-        error: "Gemini вернул ответ не в формате JSON. Нажми кнопку генерации ещё раз."
-      });
+    let parsed = parseLooseJson(generated.text);
+
+    if (!parsed) {
+      try {
+        parsed = await convertTextToJson(generated.text, input);
+      } catch {}
     }
 
-    const normalized = normalizeResult(parsed, input);
-    const text = resultToText(normalized);
+    let normalized;
+
+    if (parsed) {
+      normalized = normalizeResult(parsed, input);
+    } else {
+      normalized = normalizeResult({
+        title: `Альтернативная история: ${input.eventTitle}`,
+        shortSummary: `Gemini вернул текст не в JSON, поэтому приложение собрало безопасный результат по данным пользователя. Главная точка изменения: ${input.change}.`,
+        changedPoint: input.change
+      }, input);
+    }
 
     return res.status(200).json({
       ok: true,
       model: generated.model,
       result: normalized,
-      resultText: text,
       ...normalized
     });
   } catch (error) {
