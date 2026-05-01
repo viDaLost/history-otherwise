@@ -34,69 +34,68 @@ function buildIllustrationPrompt(payload) {
   const region = crop(payload.region, 120);
 
   return `
-Создай одну детальную иллюстрацию для мобильного приложения об альтернативной истории.
+Create one cinematic alternative history illustration for a mobile app.
 
-Главная задача:
-Показать общее положение мира после изменения истории.
-Зритель должен по картинке понять, как изменилась политика, общество, экономика, армия и повседневная жизнь.
+Main goal:
+Show the overall new world after the user's historical change.
+The viewer must understand how politics, society, economy, military balance, technology, and daily life changed.
 
-Сценарий:
+Scenario title:
 ${title}
 
-Регион:
+Region:
 ${region}
 
-Период:
+Period:
 ${period}
 
-Краткое резюме:
+Short summary:
 ${summary}
 
-Ключевое изменение:
+Key historical change:
 ${changedPoint}
 
-Первые последствия:
+Immediate consequences:
 ${firstConsequences}
 
-Политика:
+Politics:
 ${politics}
 
-Экономика:
+Economy:
 ${economy}
 
-Военная сфера:
+Military:
 ${military}
 
-Технологии:
+Technology:
 ${technology}
 
-Культура:
+Culture:
 ${culture}
 
-Современный итог:
+Modern result:
 ${modernWorld}
 
-Визуальный стиль:
-кинематографичная историческая сцена,
-реалистичный digital concept art,
-широкая композиция,
-глубина пространства,
-много деталей,
-серьёзная атмосфера,
-свет как в драматическом фильме,
-премиальный вид,
-без текста,
-без букв,
-без подписей,
-без водяных знаков,
-без логотипов,
-без интерфейса,
-без плакатов с читаемыми словами.
+Visual style:
+realistic cinematic digital concept art,
+serious historical atmosphere,
+wide narrative composition,
+deep perspective,
+rich environment detail,
+dramatic lighting,
+premium mobile app illustration,
+no text,
+no letters,
+no readable signs,
+no captions,
+no watermark,
+no logo,
+no UI.
 
-Композиция:
-на переднем плане покажи обычных людей и признаки новой повседневной жизни,
-на среднем плане покажи власть, армию, промышленность или общественные изменения,
-на дальнем плане покажи город, символы государства, архитектуру и масштаб последствий.
+Composition:
+foreground: ordinary people and signs of changed daily life,
+middle ground: government, army, industry, protests, institutions, or public order,
+background: city, architecture, state symbols without readable text, scale of historical change.
 `;
 }
 
@@ -112,6 +111,34 @@ function parseGeminiError(error) {
   return raw;
 }
 
+function getParts(response) {
+  return response?.candidates?.[0]?.content?.parts || [];
+}
+
+function extractImage(parts) {
+  for (const part of parts) {
+    if (part?.inlineData?.data) {
+      const mimeType = part.inlineData.mimeType || "image/png";
+      return `data:${mimeType};base64,${part.inlineData.data}`;
+    }
+
+    if (part?.inline_data?.data) {
+      const mimeType = part.inline_data.mime_type || "image/png";
+      return `data:${mimeType};base64,${part.inline_data.data}`;
+    }
+  }
+
+  return "";
+}
+
+function extractText(parts) {
+  return parts
+    .map((part) => part?.text || "")
+    .filter(Boolean)
+    .join("\n")
+    .trim();
+}
+
 async function generateGeminiImage(prompt) {
   const models = [
     "gemini-2.5-flash-image",
@@ -124,30 +151,24 @@ async function generateGeminiImage(prompt) {
     try {
       const response = await ai.models.generateContent({
         model,
-        contents: prompt
+        contents: prompt,
+        config: {
+          responseModalities: ["Image"]
+        }
       });
 
-      const parts = response?.candidates?.[0]?.content?.parts || response?.parts || [];
+      const parts = getParts(response);
+      const imageUrl = extractImage(parts);
 
-      for (const part of parts) {
-        if (part?.inlineData?.data) {
-          const mimeType = part.inlineData.mimeType || "image/png";
-          return {
-            model,
-            imageUrl: `data:${mimeType};base64,${part.inlineData.data}`
-          };
-        }
-
-        if (part?.inline_data?.data) {
-          const mimeType = part.inline_data.mime_type || "image/png";
-          return {
-            model,
-            imageUrl: `data:${mimeType};base64,${part.inline_data.data}`
-          };
-        }
+      if (imageUrl) {
+        return {
+          model,
+          imageUrl
+        };
       }
 
-      lastError = `Модель ${model} не вернула изображение.`;
+      const text = extractText(parts);
+      lastError = text || `Модель ${model} ответила без изображения.`;
     } catch (error) {
       lastError = parseGeminiError(error);
     }
