@@ -3,6 +3,8 @@ const $ = (selector) => document.querySelector(selector);
 const form = $("#historyForm");
 const submitBtn = $("#submitBtn");
 const loadingCard = $("#loadingCard");
+const loadingTitle = $("#loadingTitle");
+const loadingText = $("#loadingText");
 const errorBox = $("#errorBox");
 const resultShell = $("#resultShell");
 const resultTitle = $("#resultTitle");
@@ -77,20 +79,7 @@ function splitToBullets(text) {
 
 function normalizeResult(payload, input = {}) {
   let raw = payload?.result && typeof payload.result === "object" ? payload.result : payload;
-
-  if (typeof raw === "string") {
-    raw = {
-      title: input.eventTitle || "Альтернативная история",
-      shortSummary: raw,
-      resultText: raw
-    };
-  }
-
   raw = raw || {};
-
-  const after5 = pick(raw, ["after5Years", "fiveYears", "resultAfter5Years"]);
-  const after20 = pick(raw, ["after20Years", "twentyYears", "resultAfter20Years"]);
-  const after50 = pick(raw, ["after50Years", "fiftyYears", "resultAfter50Years"]);
 
   const result = {
     title: toText(pick(raw, ["title", "scenarioTitle", "name"])) || "Альтернативная история",
@@ -98,18 +87,18 @@ function normalizeResult(payload, input = {}) {
     realHistoryContext: toText(pick(raw, ["realHistoryContext", "context", "historicalContext"])),
     changedPoint: toText(pick(raw, ["changedPoint", "change", "mainChange"])) || input.change || "",
     firstConsequences: toText(pick(raw, ["firstConsequences", "immediateConsequences", "firstEffects"])),
-    causeChain: toText(pick(raw, ["causeChain", "chainOfConsequences", "causeEffectChain", "consequencesChain"])),
-    politics: toText(pick(raw, ["politics", "politicalConsequences", "politicalImpact"])),
-    economy: toText(pick(raw, ["economy", "economicConsequences", "economicImpact"])),
-    military: toText(pick(raw, ["military", "militaryConsequences", "warConsequences", "wars"])),
-    technology: toText(pick(raw, ["technology", "technologyConsequences", "technologicalConsequences", "tech"])),
-    culture: toText(pick(raw, ["culture", "culturalConsequences", "culturalImpact"])),
-    society: toText(pick(raw, ["society", "socialConsequences", "socialImpact"])),
+    causeChain: toText(pick(raw, ["causeChain", "chainOfConsequences", "causeEffectChain"])),
+    politics: toText(pick(raw, ["politics", "politicalConsequences"])),
+    economy: toText(pick(raw, ["economy", "economicConsequences"])),
+    military: toText(pick(raw, ["military", "militaryConsequences", "wars"])),
+    technology: toText(pick(raw, ["technology", "technologyConsequences", "tech"])),
+    culture: toText(pick(raw, ["culture", "culturalConsequences"])),
+    society: toText(pick(raw, ["society", "socialConsequences"])),
     bordersAndAlliances: toText(pick(raw, ["bordersAndAlliances", "alliances", "borders"])),
     ordinaryPeopleLife: toText(pick(raw, ["ordinaryPeopleLife", "peopleLife", "dailyLife"])),
-    after5Years: toText(after5),
-    after20Years: toText(after20),
-    after50Years: toText(after50),
+    after5Years: toText(pick(raw, ["after5Years", "fiveYears"])),
+    after20Years: toText(pick(raw, ["after20Years", "twentyYears"])),
+    after50Years: toText(pick(raw, ["after50Years", "fiftyYears"])),
     modernWorldResult: toText(pick(raw, ["modernWorldResult", "modernWorld", "currentWorld"])),
     probabilityScore: Number(pick(raw, ["probabilityScore", "plausibility", "score"])) || 50,
     risks: toText(pick(raw, ["risks", "scenarioRisks", "weakPoints"])),
@@ -117,7 +106,9 @@ function normalizeResult(payload, input = {}) {
     videoScriptVersion: toText(pick(raw, ["videoScriptVersion", "youtubeVersion", "videoVersion"])),
     voiceoverVersion: toText(pick(raw, ["voiceoverVersion", "voiceVersion", "narration"])),
     timeline: Array.isArray(raw.timeline) ? raw.timeline : [],
-    causeEffectMap: Array.isArray(raw.causeEffectMap) ? raw.causeEffectMap : []
+    causeEffectMap: Array.isArray(raw.causeEffectMap) ? raw.causeEffectMap : [],
+    illustration: raw.illustration || null,
+    illustrationPrompt: raw.illustrationPrompt || ""
   };
 
   result.probabilityScore = Math.max(1, Math.min(100, Math.round(result.probabilityScore)));
@@ -242,6 +233,25 @@ function renderMap(result) {
           </ul>
         </article>
       `).join("")}
+    </div>
+  `;
+}
+
+function renderImage(result) {
+  const imageHtml = result.illustration
+    ? `<div class="image-frame"><img src="${result.illustration}" alt="Иллюстрация альтернативной истории" /></div>`
+    : `<div class="image-frame"><div class="image-placeholder">Иллюстрация не была сохранена в истории. Сгенерируй сценарий заново, чтобы получить новую картинку.</div></div>`;
+
+  tabContent.innerHTML = `
+    <div class="section-grid">
+      <article class="image-card">
+        <h3>Иллюстрация сценария</h3>
+        <p>Картинка показывает общее положение, атмосферу и последствия того изменения, которое ты внёс в историю.</p>
+      </article>
+
+      ${imageHtml}
+
+      ${infoCard("Что показывает картинка", `Иллюстрация опирается на название сценария, ключевое изменение, первые последствия и современный мир в этой версии истории.`)}
     </div>
   `;
 }
@@ -373,7 +383,11 @@ function renderExport(result) {
 
   $("#copyFull")?.addEventListener("click", () => copyText(resultToText(result)));
   $("#downloadTxt")?.addEventListener("click", () => downloadFile("history-otherwise.txt", resultToText(result), "text/plain;charset=utf-8"));
-  $("#downloadJson")?.addEventListener("click", () => downloadFile("history-otherwise.json", JSON.stringify(result, null, 2), "application/json;charset=utf-8"));
+  $("#downloadJson")?.addEventListener("click", () => {
+    const clone = { ...result };
+    delete clone.illustration;
+    downloadFile("history-otherwise.json", JSON.stringify(clone, null, 2), "application/json;charset=utf-8");
+  });
   $("#copyShort")?.addEventListener("click", () => copyText(`${result.title}\n\n${result.shortSummary}`));
   $("#copyVideo")?.addEventListener("click", () => copyText(result.videoScriptVersion || result.shortSummary, "Версия для YouTube скопирована"));
   $("#copyVoice")?.addEventListener("click", () => copyText(result.voiceoverVersion || result.shortSummary, "Версия для озвучки скопирована"));
@@ -386,6 +400,7 @@ function renderCurrentTab() {
   if (activeTab === "analysis") renderAnalysis(currentResult);
   if (activeTab === "timeline") renderTimeline(currentResult);
   if (activeTab === "map") renderMap(currentResult);
+  if (activeTab === "image") renderImage(currentResult);
   if (activeTab === "export") renderExport(currentResult);
 }
 
@@ -414,7 +429,7 @@ function showResult(result) {
 function showToast(message) {
   toast.textContent = message;
   toast.classList.remove("hidden");
-  setTimeout(() => toast.classList.add("hidden"), 1500);
+  setTimeout(() => toast.classList.add("hidden"), 1600);
 }
 
 function showError(message) {
@@ -429,7 +444,7 @@ function hideError() {
 
 function getHistory() {
   try {
-    return JSON.parse(localStorage.getItem("historyOtherwiseV2") || "[]");
+    return JSON.parse(localStorage.getItem("historyOtherwiseV3") || "[]");
   } catch {
     return [];
   }
@@ -437,14 +452,18 @@ function getHistory() {
 
 function saveHistory(item) {
   const items = getHistory();
-  items.unshift(item);
-  localStorage.setItem("historyOtherwiseV2", JSON.stringify(items.slice(0, 10)));
+  const safeItem = JSON.parse(JSON.stringify(item));
+  if (safeItem.result) {
+    delete safeItem.result.illustration;
+  }
+  items.unshift(safeItem);
+  localStorage.setItem("historyOtherwiseV3", JSON.stringify(items.slice(0, 10)));
   renderHistory();
 }
 
 function deleteHistory(id) {
   const items = getHistory().filter((item) => item.id !== id);
-  localStorage.setItem("historyOtherwiseV2", JSON.stringify(items));
+  localStorage.setItem("historyOtherwiseV3", JSON.stringify(items));
   renderHistory();
 }
 
@@ -492,6 +511,33 @@ function collectInput() {
   };
 }
 
+async function generateIllustration(input, result) {
+  loadingTitle.textContent = "Создаю иллюстрацию";
+  loadingText.textContent = "Собираю общий образ новой версии истории.";
+
+  const response = await fetch("/api/generate-image", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      ...input,
+      ...result
+    })
+  });
+
+  const payload = await response.json();
+
+  if (!response.ok) {
+    throw new Error(payload.error || "Не удалось создать иллюстрацию.");
+  }
+
+  return {
+    illustration: payload.imageUrl || "",
+    illustrationPrompt: payload.imagePrompt || ""
+  };
+}
+
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -507,6 +553,8 @@ form.addEventListener("submit", async (event) => {
   submitBtn.disabled = true;
   loadingCard.classList.remove("hidden");
   resultShell.classList.add("hidden");
+  loadingTitle.textContent = "Строю ветку истории";
+  loadingText.textContent = "Сначала генерирую анализ и временную линию.";
 
   try {
     const response = await fetch("/api/generate", {
@@ -524,6 +572,16 @@ form.addEventListener("submit", async (event) => {
     }
 
     const result = normalizeResult(payload, data);
+
+    try {
+      const imageData = await generateIllustration(data, result);
+      result.illustration = imageData.illustration;
+      result.illustrationPrompt = imageData.illustrationPrompt;
+    } catch (imageError) {
+      result.illustration = "";
+      result.illustrationPrompt = "";
+      showToast("Текст готов. Иллюстрация не создалась.");
+    }
 
     showResult(result);
     saveHistory({
@@ -555,7 +613,7 @@ historyToggle.addEventListener("click", () => {
 });
 
 clearHistory.addEventListener("click", () => {
-  localStorage.removeItem("historyOtherwiseV2");
+  localStorage.removeItem("historyOtherwiseV3");
   renderHistory();
   showToast("История очищена");
 });

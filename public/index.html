@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>История Иначе</title>
-  <meta name="description" content="Мобильный симулятор альтернативной истории на Gemini API." />
+  <meta name="description" content="Мобильный симулятор альтернативной истории с автоматической генерацией иллюстрации." />
   <meta name="theme-color" content="#07111f" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -78,7 +78,7 @@
 
         <button class="main-btn" id="submitBtn" type="submit">
           <span>Смоделировать</span>
-          <small>Gemini API</small>
+          <small>текст + иллюстрация</small>
         </button>
       </form>
     </section>
@@ -86,8 +86,8 @@
     <section class="loading-card hidden" id="loadingCard">
       <div class="loader"></div>
       <div>
-        <h3>Строю ветку истории</h3>
-        <p>Обычно это занимает несколько секунд. Короткий ввод даёт более быстрый ответ.</p>
+        <h3 id="loadingTitle">Строю ветку истории</h3>
+        <p id="loadingText">Обычно это занимает несколько секунд.</p>
       </div>
     </section>
 
@@ -111,6 +111,7 @@
         <button class="tab" type="button" data-tab="analysis">Анализ</button>
         <button class="tab" type="button" data-tab="timeline">Линия</button>
         <button class="tab" type="button" data-tab="map">Карта</button>
+        <button class="tab" type="button" data-tab="image">Иллюстрация</button>
         <button class="tab" type="button" data-tab="export">Экспорт</button>
       </nav>
 
