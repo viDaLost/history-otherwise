@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 export const config = {
   maxDuration: 60
@@ -13,111 +13,165 @@ function cleanText(value) {
   return value.trim();
 }
 
-function buildPrompt(data) {
-  const eventTitle = cleanText(data.eventTitle || data.title || data.event || "Не указано");
-  const region = cleanText(data.region || data.country || "Не указано");
-  const period = cleanText(data.period || data.year || data.date || "Не указано");
-  const change = cleanText(data.change || data.mainChange || data.prompt || "");
-  const depth = cleanText(data.depth || "Глубокий анализ");
-  const style = cleanText(data.style || "Документальный");
+function toText(value) {
+  if (Array.isArray(value)) return value.filter(Boolean).join("\n\n");
+  if (typeof value === "string") return value.trim();
+  if (value && typeof value === "object") return JSON.stringify(value, null, 2);
+  return "";
+}
+
+function normalizeResult(data) {
+  const result = data && typeof data === "object" ? data : {};
+
+  const after5Years = toText(result.after5Years || result.fiveYears || result.resultAfter5Years);
+  const after20Years = toText(result.after20Years || result.twentyYears || result.resultAfter20Years);
+  const after50Years = toText(result.after50Years || result.fiftyYears || result.resultAfter50Years);
+
+  return {
+    title: toText(result.title),
+    shortSummary: toText(result.shortSummary),
+    realHistoryContext: toText(result.realHistoryContext),
+    changedPoint: toText(result.changedPoint),
+    firstConsequences: toText(result.firstConsequences),
+    causeChain: toText(result.causeChain),
+    politics: toText(result.politics),
+    economy: toText(result.economy),
+    military: toText(result.military),
+    technology: toText(result.technology),
+    culture: toText(result.culture),
+    society: toText(result.society),
+    bordersAndAlliances: toText(result.bordersAndAlliances),
+    ordinaryPeopleLife: toText(result.ordinaryPeopleLife),
+    after5Years,
+    after20Years,
+    after50Years,
+    fiveYears: after5Years,
+    twentyYears: after20Years,
+    fiftyYears: after50Years,
+    modernWorldResult: toText(result.modernWorldResult),
+    probabilityScore: Number(result.probabilityScore) || 50,
+    risks: toText(result.risks),
+    sourcesNote: toText(result.sourcesNote),
+    videoScriptVersion: toText(result.videoScriptVersion),
+    voiceoverVersion: toText(result.voiceoverVersion),
+    timeline: Array.isArray(result.timeline) ? result.timeline : [],
+    causeEffectMap: Array.isArray(result.causeEffectMap) ? result.causeEffectMap : []
+  };
+}
+
+function buildPrompt(body) {
+  const eventTitle = cleanText(body.eventTitle || body.title || body.event || "Не указано");
+  const region = cleanText(body.region || body.country || "Не указано");
+  const period = cleanText(body.period || body.year || body.date || "Не указано");
+  const change = cleanText(body.change || body.mainChange || body.prompt || "");
+  const depth = cleanText(body.depth || "Глубокий анализ");
+  const style = cleanText(body.style || "Документальный");
 
   return `
-Ты исторический аналитик, сценарист и редактор альтернативной истории.
-
-Твоя задача: построить правдоподобную альтернативную ветку истории на русском языке.
+Создай альтернативную историю на русском языке.
 
 Данные пользователя:
+Событие: ${eventTitle}
+Регион: ${region}
+Период: ${period}
+Главное изменение: ${change}
+Глубина анализа: ${depth}
+Стиль: ${style}
 
-Событие:
-${eventTitle}
-
-Страна, регион или мир:
-${region}
-
-Дата или период:
-${period}
-
-Главное изменение:
-${change}
-
-Глубина анализа:
-${depth}
-
-Стиль ответа:
-${style}
-
-Правила ответа:
-
-1. Отделяй реальные исторические факты от предположений.
-2. Не выдавай выдуманные события за настоящие.
-3. Не пиши хаотичный рассказ.
-4. Покажи цепочку причин и последствий.
-5. Объясни, какие последствия сильные, а какие спорные.
-6. Пиши ясно, подробно и интересно.
-7. Не уходи в магию, фантастику или случайные события без причин.
-8. Делай акцент на политике, экономике, войнах, культуре, технологиях, границах, союзах и жизни обычных людей.
-9. Ответ должен быть полезен для чтения, видео, озвучки и дальнейшей доработки.
-
-Структура ответа:
-
-Название сценария
-
-Краткое резюме
-
-Реальный исторический контекст
-
-Точка изменения
-
-Первые последствия
-
-Цепочка причин и последствий
-
-Политические последствия
-
-Экономические последствия
-
-Военные последствия
-
-Технологические последствия
-
-Культурные последствия
-
-Изменение границ и союзов
-
-Жизнь обычных людей
-
-Временная линия:
-сделай 8–12 пунктов.
-У каждого пункта укажи год, название события, описание и уровень влияния.
-
-Карта последствий:
-раздели на ветви:
-политика
-экономика
-войны
-технологии
-культура
-общество
-
-Итог через 5 лет
-
-Итог через 20 лет
-
-Итог через 50 лет
-
-Современный мир в этой версии истории
-
-Оценка правдоподобности от 1 до 100
-
-Главные слабые места сценария
-
-Короткая версия для видео
-
-Версия для озвучки
-
-Начинай сразу с результата.
+Правила:
+1. Отделяй реальные факты от предположений.
+2. Не выдавай выдуманные события за реальные.
+3. Покажи причинно-следственную логику.
+4. Заполни все поля JSON.
+5. Не оставляй пустые поля.
+6. probabilityScore дай числом от 1 до 100.
+7. timeline сделай из 8 пунктов.
+8. causeEffectMap сделай из 6 ветвей: политика, экономика, войны, технологии, культура, общество.
 `;
 }
+
+const responseSchema = {
+  type: Type.OBJECT,
+  properties: {
+    title: { type: Type.STRING },
+    shortSummary: { type: Type.STRING },
+    realHistoryContext: { type: Type.STRING },
+    changedPoint: { type: Type.STRING },
+    firstConsequences: { type: Type.STRING },
+    causeChain: { type: Type.STRING },
+    politics: { type: Type.STRING },
+    economy: { type: Type.STRING },
+    military: { type: Type.STRING },
+    technology: { type: Type.STRING },
+    culture: { type: Type.STRING },
+    society: { type: Type.STRING },
+    bordersAndAlliances: { type: Type.STRING },
+    ordinaryPeopleLife: { type: Type.STRING },
+    after5Years: { type: Type.STRING },
+    after20Years: { type: Type.STRING },
+    after50Years: { type: Type.STRING },
+    modernWorldResult: { type: Type.STRING },
+    probabilityScore: { type: Type.NUMBER },
+    risks: { type: Type.STRING },
+    sourcesNote: { type: Type.STRING },
+    videoScriptVersion: { type: Type.STRING },
+    voiceoverVersion: { type: Type.STRING },
+    timeline: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          year: { type: Type.STRING },
+          title: { type: Type.STRING },
+          description: { type: Type.STRING },
+          impactLevel: { type: Type.STRING }
+        },
+        required: ["year", "title", "description", "impactLevel"]
+      }
+    },
+    causeEffectMap: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          branch: { type: Type.STRING },
+          items: {
+            type: Type.ARRAY,
+            items: { type: Type.STRING }
+          }
+        },
+        required: ["branch", "items"]
+      }
+    }
+  },
+  required: [
+    "title",
+    "shortSummary",
+    "realHistoryContext",
+    "changedPoint",
+    "firstConsequences",
+    "causeChain",
+    "politics",
+    "economy",
+    "military",
+    "technology",
+    "culture",
+    "society",
+    "bordersAndAlliances",
+    "ordinaryPeopleLife",
+    "after5Years",
+    "after20Years",
+    "after50Years",
+    "modernWorldResult",
+    "probabilityScore",
+    "risks",
+    "sourcesNote",
+    "videoScriptVersion",
+    "voiceoverVersion",
+    "timeline",
+    "causeEffectMap"
+  ]
+};
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -142,36 +196,39 @@ export default async function handler(req, res) {
       });
     }
 
-    if (change.length > 5000) {
-      return res.status(400).json({
-        error: "Текст слишком длинный. Сократи описание изменения до 5000 символов."
-      });
-    }
-
-    const prompt = buildPrompt(body);
-
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-lite",
-      contents: prompt,
+      contents: buildPrompt(body),
       config: {
-        temperature: 0.75,
-        maxOutputTokens: 4096
+        temperature: 0.65,
+        maxOutputTokens: 4096,
+        responseMimeType: "application/json",
+        responseSchema
       }
     });
 
-    const result = response.text || "";
+    let parsed;
 
-    if (!result) {
+    try {
+      parsed = JSON.parse(response.text || "{}");
+    } catch {
       return res.status(500).json({
-        error: "Gemini вернул пустой ответ. Попробуй ещё раз."
+        error: "Gemini вернул не JSON. Попробуй ещё раз или уменьши запрос."
       });
     }
 
-    return res.status(200).json({
-      result
-    });
+    return res.status(200).json(normalizeResult(parsed));
   } catch (error) {
-    const message = error?.message || "Ошибка генерации через Gemini API.";
+    const rawMessage = error?.message || "Ошибка генерации через Gemini API.";
+    let message = rawMessage;
+
+    try {
+      const jsonStart = rawMessage.indexOf("{");
+      if (jsonStart >= 0) {
+        const parsedError = JSON.parse(rawMessage.slice(jsonStart));
+        message = parsedError?.error?.message || rawMessage;
+      }
+    } catch {}
 
     return res.status(500).json({
       error: message
