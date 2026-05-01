@@ -1,20 +1,11 @@
 {
-  "name": "istoriya-inache",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "description": "Веб-приложение для генерации альтернативной истории через OpenAI API.",
-  "scripts": {
-    "dev": "vercel dev",
-    "start": "vercel dev"
-  },
-  "dependencies": {
-    "openai": "^6.35.0"
-  },
-  "devDependencies": {
-    "vercel": "^41.7.0"
-  },
-  "engines": {
-    "node": ">=20.11.0"
-  }
+“name”: “history-otherwise”,
+“version”: “1.0.0”,
+“private”: true,
+“type”: “module”,
+“scripts”: {
+“dev”: “vercel dev”
+},
+“dependencies”: {
+“@google/genai”: “latest”
 }
