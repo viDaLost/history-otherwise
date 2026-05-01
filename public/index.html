@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="История Иначе. Симулятор альтернативных событий на русском языке."
+    />
+    <title>История Иначе</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+
+  <body>
+    <canvas id="timeCanvas" aria-hidden="true"></canvas>
+
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#home" aria-label="История Иначе">
+          <span class="brand-mark">ИИ</span>
+          <span>
+            <strong>История Иначе</strong>
+            <small>Симулятор альтернативных событий</small>
+          </span>
+        </a>
+
+        <nav class="nav">
+          <a href="#create">Создать</a>
+          <a href="#history">История</a>
+          <a href="#result">Результат</a>
+        </nav>
+      </header>
+
+      <main>
+        <section id="home" class="hero section">
+          <div class="hero-content">
+            <p class="eyebrow">Архив исторических вариантов</p>
+            <h1>История Иначе</h1>
+            <p class="hero-text">
+              Выбери реальное событие, измени одну деталь и посмотри, как это
+              влияет на политику, экономику, войны, культуру, технологии и жизнь
+              людей.
+            </p>
+
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="#create">Создать альтернативную историю</a>
+              <button class="btn btn-ghost" id="fillRandomExample" type="button">
+                Вставить пример
+              </button>
+            </div>
+
+            <div class="hero-stats">
+              <div>
+                <strong>JSON</strong>
+                <span>структурный ответ</span>
+              </div>
+              <div>
+                <strong>localStorage</strong>
+                <span>история запросов</span>
+              </div>
+              <div>
+                <strong>API safe</strong>
+                <span>ключ только на сервере</span>
+              </div>
+            </div>
+          </div>
+
+          <aside class="hero-card">
+            <div class="orb"></div>
+            <h2>Точка изменения</h2>
+            <p>
+              Одно событие запускает новую ветку причин и последствий. Приложение
+              строит карту влияния и временную линию.
+            </p>
+            <div class="signal-lines">
+              <span></span>
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </aside>
+        </section>
+
+        <section class="section examples-section">
+          <div class="section-head">
+            <p class="eyebrow">Готовые идеи</p>
+            <h2>Примеры сценариев</h2>
+          </div>
+
+          <div id="examplesGrid" class="examples-grid"></div>
+        </section>
+
+        <section class="section how-section">
+          <div class="section-head">
+            <p class="eyebrow">Логика</p>
+            <h2>Как это работает</h2>
+          </div>
+
+          <div class="steps">
+            <article>
+              <span>01</span>
+              <h3>Ты задаёшь точку</h3>
+              <p>Событие, регион, период и главное изменение.</p>
+            </article>
+            <article>
+              <span>02</span>
+              <h3>Модель строит ветку</h3>
+              <p>Сначала реальный контекст, потом последствия.</p>
+            </article>
+            <article>
+              <span>03</span>
+              <h3>Приложение рисует результат</h3>
+              <p>Timeline, карта причин, блоки анализа и экспорт.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="create" class="section create-section">
+          <div class="section-head">
+            <p class="eyebrow">Новый сценарий</p>
+            <h2>Создание альтернативной истории</h2>
+          </div>
+
+          <form id="scenarioForm" class="scenario-form">
+            <div class="form-grid">
+              <label>
+                <span>Название события</span>
+                <input
+                  id="eventTitle"
+                  name="eventTitle"
+                  type="text"
+                  maxlength="120"
+                  placeholder="Например: Распад СССР"
+                  autocomplete="off"
+                  required
+                />
+              </label>
+
+              <label>
+                <span>Страна или регион</span>
+                <input
+                  id="region"
+                  name="region"
+                  type="text"
+                  maxlength="120"
+                  placeholder="Например: Россия, Европа, мир"
+                  autocomplete="off"
+                  required
+                />
+              </label>
+
+              <label>
+                <span>Реальная дата или период</span>
+                <input
+                  id="period"
+                  name="period"
+                  type="text"
+                  maxlength="80"
+                  placeholder="Например: 1991 год"
+                  autocomplete="off"
+                  required
+                />
+              </label>
+
+              <label>
+                <span>Глубина анализа</span>
+                <select id="depth" name="depth">
+                  <option value="short">Короткий анализ</option>
+                  <option value="medium" selected>Средний анализ</option>
+                  <option value="deep">Глубокий анализ</option>
+                </select>
+              </label>
+
+              <label>
+                <span>Стиль ответа</span>
+                <select id="style" name="style">
+                  <option value="documentary" selected>Документальный</option>
+                  <option value="dramatic">Драматичный</option>
+                  <option value="scientific">Научно-исторический</option>
+                  <option value="chronicle">Краткая хроника</option>
+                  <option value="video">Сценарий для видео</option>
+                </select>
+              </label>
+            </div>
+
+            <label class="wide-label">
+              <span>Что изменилось</span>
+              <textarea
+                id="change"
+                name="change"
+                maxlength="3600"
+                rows="7"
+                placeholder="Например: СССР не распался в 1991 году, а был преобразован в обновлённую федерацию."
+                required
+              ></textarea>
+            </label>
+
+            <div class="form-footer">
+              <p id="formHint">
+                Заполни страну, год, событие и главное изменение. Чем точнее ввод,
+                тем логичнее результат.
+              </p>
+
+              <button class="btn btn-primary" id="submitBtn" type="submit">
+                Смоделировать историю
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section id="result" class="section result-section">
+          <div class="section-head">
+            <p class="eyebrow">Ответ модели</p>
+            <h2>Результат</h2>
+          </div>
+
+          <div id="loadingBox" class="loading-box hidden">
+            <div class="loader"></div>
+            <p>Моделирую альтернативную ветку истории...</p>
+          </div>
+
+          <div id="errorBox" class="error-box hidden"></div>
+
+          <div id="emptyResult" class="empty-result">
+            <h3>Здесь появится результат</h3>
+            <p>
+              После генерации ты увидишь резюме, последствия, временную линию,
+              карту причин и экспорт.
+            </p>
+          </div>
+
+          <div id="resultContent" class="result-content hidden"></div>
+        </section>
+
+        <section id="history" class="section history-section">
+          <div class="section-head">
+            <p class="eyebrow">Память браузера</p>
+            <h2>История запросов</h2>
+          </div>
+
+          <div id="historyList" class="history-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>
