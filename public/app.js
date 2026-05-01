@@ -20,6 +20,7 @@ const fillExample = $("#fillExample");
 const toast = $("#toast");
 
 let currentResult = null;
+let currentInput = null;
 let activeTab = "overview";
 
 const examples = [
@@ -108,7 +109,8 @@ function normalizeResult(payload, input = {}) {
     timeline: Array.isArray(raw.timeline) ? raw.timeline : [],
     causeEffectMap: Array.isArray(raw.causeEffectMap) ? raw.causeEffectMap : [],
     illustration: raw.illustration || null,
-    illustrationPrompt: raw.illustrationPrompt || ""
+    illustrationPrompt: raw.illustrationPrompt || "",
+    illustrationError: raw.illustrationError || ""
   };
 
   result.probabilityScore = Math.max(1, Math.min(100, Math.round(result.probabilityScore)));
@@ -199,11 +201,9 @@ function renderAnalysis(result) {
 }
 
 function renderTimeline(result) {
-  const items = result.timeline || [];
-
   tabContent.innerHTML = `
     <div class="timeline">
-      ${items.map((item) => `
+      ${(result.timeline || []).map((item) => `
         <article class="timeline-card">
           <div class="timeline-year">${escapeHtml(item.year || "")}</div>
           <div class="pill">влияние: ${escapeHtml(item.impactLevel || "средний")}</div>
@@ -216,8 +216,6 @@ function renderTimeline(result) {
 }
 
 function renderMap(result) {
-  const branches = result.causeEffectMap || [];
-
   tabContent.innerHTML = `
     <div class="section-grid">
       <article class="map-card map-center">
@@ -225,7 +223,7 @@ function renderMap(result) {
         <p>${escapeHtml(result.changedPoint || result.shortSummary)}</p>
       </article>
 
-      ${branches.map((branch) => `
+      ${(result.causeEffectMap || []).map((branch) => `
         <article class="map-card">
           <h3>${escapeHtml(branch.branch || "Ветвь")}</h3>
           <ul class="map-items">
@@ -237,10 +235,45 @@ function renderMap(result) {
   `;
 }
 
+async function retryImage() {
+  if (!currentResult || !currentInput) return;
+
+  loadingCard.classList.remove("hidden");
+  loadingTitle.textContent = "Повторяю генерацию иллюстрации";
+  loadingText.textContent = "Пробую получить изображение через Gemini.";
+
+  try {
+    const imageData = await generateIllustration(currentInput, currentResult);
+    currentResult.illustration = imageData.illustration;
+    currentResult.illustrationPrompt = imageData.illustrationPrompt;
+    currentResult.illustrationError = "";
+    renderImage(currentResult);
+    showToast("Иллюстрация готова");
+  } catch (error) {
+    currentResult.illustrationError = error.message || "Иллюстрация не создалась.";
+    renderImage(currentResult);
+  } finally {
+    loadingCard.classList.add("hidden");
+  }
+}
+
 function renderImage(result) {
-  const imageHtml = result.illustration
-    ? `<div class="image-frame"><img src="${result.illustration}" alt="Иллюстрация альтернативной истории" /></div>`
-    : `<div class="image-frame"><div class="image-placeholder">Иллюстрация не была сохранена в истории. Сгенерируй сценарий заново, чтобы получить новую картинку.</div></div>`;
+  let imageHtml = "";
+
+  if (result.illustration) {
+    imageHtml = `<div class="image-frame"><img src="${result.illustration}" alt="Иллюстрация альтернативной истории" /></div>`;
+  } else {
+    const message = result.illustrationError
+      ? `Иллюстрация не создалась. Ошибка: ${result.illustrationError}`
+      : "Иллюстрация пока не создана.";
+
+    imageHtml = `
+      <div class="image-frame">
+        <div class="image-placeholder">${escapeHtml(message)}</div>
+      </div>
+      <button class="action-btn primary" id="retryImageBtn" type="button">Повторить генерацию картинки</button>
+    `;
+  }
 
   tabContent.innerHTML = `
     <div class="section-grid">
@@ -251,9 +284,11 @@ function renderImage(result) {
 
       ${imageHtml}
 
-      ${infoCard("Что показывает картинка", `Иллюстрация опирается на название сценария, ключевое изменение, первые последствия и современный мир в этой версии истории.`)}
+      ${infoCard("Что показывает картинка", "Иллюстрация опирается на название сценария, ключевое изменение, первые последствия и современный мир в этой версии истории.")}
     </div>
   `;
+
+  $("#retryImageBtn")?.addEventListener("click", retryImage);
 }
 
 function resultToText(result) {
@@ -429,7 +464,7 @@ function showResult(result) {
 function showToast(message) {
   toast.textContent = message;
   toast.classList.remove("hidden");
-  setTimeout(() => toast.classList.add("hidden"), 1600);
+  setTimeout(() => toast.classList.add("hidden"), 1800);
 }
 
 function showError(message) {
@@ -490,6 +525,7 @@ function renderHistory() {
     button.addEventListener("click", () => {
       const item = getHistory().find((entry) => entry.id === button.dataset.open);
       if (!item) return;
+      currentInput = item.input || null;
       showResult(item.result);
       historyPanel.classList.add("hidden");
     });
@@ -513,7 +549,7 @@ function collectInput() {
 
 async function generateIllustration(input, result) {
   loadingTitle.textContent = "Создаю иллюстрацию";
-  loadingText.textContent = "Собираю общий образ новой версии истории.";
+  loadingText.textContent = "Пробую получить изображение через Gemini.";
 
   const response = await fetch("/api/generate-image", {
     method: "POST",
@@ -542,6 +578,7 @@ form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const data = collectInput();
+  currentInput = data;
 
   hideError();
 
@@ -577,9 +614,12 @@ form.addEventListener("submit", async (event) => {
       const imageData = await generateIllustration(data, result);
       result.illustration = imageData.illustration;
       result.illustrationPrompt = imageData.illustrationPrompt;
+      result.illustrationError = "";
+      showToast("Текст и иллюстрация готовы");
     } catch (imageError) {
       result.illustration = "";
       result.illustrationPrompt = "";
+      result.illustrationError = imageError.message || "Иллюстрация не создалась.";
       showToast("Текст готов. Иллюстрация не создалась.");
     }
 
