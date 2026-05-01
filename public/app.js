@@ -3,6 +3,12 @@ const $ = (selector) => document.querySelector(selector);
 const form = $("#historyForm");
 const submitBtn = $("#submitBtn");
 const loadingCard = $("#loadingCard");
+const loadingTitle = $("#loadingTitle");
+const loadingText = $("#loadingText");
+const progressPercent = $("#progressPercent");
+const progressFill = $("#progressFill");
+const progressStage = $("#progressStage");
+const progressTime = $("#progressTime");
 const errorBox = $("#errorBox");
 const resultShell = $("#resultShell");
 const resultTitle = $("#resultTitle");
@@ -19,8 +25,17 @@ const toast = $("#toast");
 
 let currentResult = null;
 let activeTab = "overview";
+let progressTimer = null;
+let progressStartedAt = 0;
+let progressEstimate = 24;
 
 const examples = [
+  {
+    eventTitle: "Вторая мировая",
+    region: "Европа",
+    period: "1939 год",
+    change: "Вторая мировая война не началась, потому что Германия столкнулась с внутренним военным заговором против руководства."
+  },
   {
     eventTitle: "Октябрьская революция",
     region: "Россия",
@@ -32,12 +47,6 @@ const examples = [
     region: "СССР, Европа, мир",
     period: "1991 год",
     change: "СССР не распался, а стал обновлённой федерацией с общей армией, общей валютой и широкой автономией республик."
-  },
-  {
-    eventTitle: "Вторая мировая война",
-    region: "Европа",
-    period: "1939 год",
-    change: "Война не началась в 1939 году, потому что Германия столкнулась с внутренним военным заговором против руководства."
   }
 ];
 
@@ -77,20 +86,7 @@ function splitToBullets(text) {
 
 function normalizeResult(payload, input = {}) {
   let raw = payload?.result && typeof payload.result === "object" ? payload.result : payload;
-
-  if (typeof raw === "string") {
-    raw = {
-      title: input.eventTitle || "Альтернативная история",
-      shortSummary: raw,
-      resultText: raw
-    };
-  }
-
   raw = raw || {};
-
-  const after5 = pick(raw, ["after5Years", "fiveYears", "resultAfter5Years"]);
-  const after20 = pick(raw, ["after20Years", "twentyYears", "resultAfter20Years"]);
-  const after50 = pick(raw, ["after50Years", "fiftyYears", "resultAfter50Years"]);
 
   const result = {
     title: toText(pick(raw, ["title", "scenarioTitle", "name"])) || "Альтернативная история",
@@ -98,18 +94,18 @@ function normalizeResult(payload, input = {}) {
     realHistoryContext: toText(pick(raw, ["realHistoryContext", "context", "historicalContext"])),
     changedPoint: toText(pick(raw, ["changedPoint", "change", "mainChange"])) || input.change || "",
     firstConsequences: toText(pick(raw, ["firstConsequences", "immediateConsequences", "firstEffects"])),
-    causeChain: toText(pick(raw, ["causeChain", "chainOfConsequences", "causeEffectChain", "consequencesChain"])),
-    politics: toText(pick(raw, ["politics", "politicalConsequences", "politicalImpact"])),
-    economy: toText(pick(raw, ["economy", "economicConsequences", "economicImpact"])),
-    military: toText(pick(raw, ["military", "militaryConsequences", "warConsequences", "wars"])),
-    technology: toText(pick(raw, ["technology", "technologyConsequences", "technologicalConsequences", "tech"])),
-    culture: toText(pick(raw, ["culture", "culturalConsequences", "culturalImpact"])),
-    society: toText(pick(raw, ["society", "socialConsequences", "socialImpact"])),
+    causeChain: toText(pick(raw, ["causeChain", "chainOfConsequences", "causeEffectChain"])),
+    politics: toText(pick(raw, ["politics", "politicalConsequences"])),
+    economy: toText(pick(raw, ["economy", "economicConsequences"])),
+    military: toText(pick(raw, ["military", "militaryConsequences", "wars"])),
+    technology: toText(pick(raw, ["technology", "technologyConsequences", "tech"])),
+    culture: toText(pick(raw, ["culture", "culturalConsequences"])),
+    society: toText(pick(raw, ["society", "socialConsequences"])),
     bordersAndAlliances: toText(pick(raw, ["bordersAndAlliances", "alliances", "borders"])),
     ordinaryPeopleLife: toText(pick(raw, ["ordinaryPeopleLife", "peopleLife", "dailyLife"])),
-    after5Years: toText(after5),
-    after20Years: toText(after20),
-    after50Years: toText(after50),
+    after5Years: toText(pick(raw, ["after5Years", "fiveYears"])),
+    after20Years: toText(pick(raw, ["after20Years", "twentyYears"])),
+    after50Years: toText(pick(raw, ["after50Years", "fiftyYears"])),
     modernWorldResult: toText(pick(raw, ["modernWorldResult", "modernWorld", "currentWorld"])),
     probabilityScore: Number(pick(raw, ["probabilityScore", "plausibility", "score"])) || 50,
     risks: toText(pick(raw, ["risks", "scenarioRisks", "weakPoints"])),
@@ -145,6 +141,83 @@ function normalizeResult(payload, input = {}) {
   }
 
   return result;
+}
+
+function calculateEstimate(data) {
+  const length = data.change.length + data.eventTitle.length + data.region.length + data.period.length;
+  let seconds = 18 + Math.round(length / 80);
+
+  if (data.depth === "Глубокий анализ") seconds += 8;
+  if (data.depth === "Короткий анализ") seconds -= 4;
+
+  return Math.max(14, Math.min(45, seconds));
+}
+
+function progressStageByPercent(percent) {
+  if (percent < 15) return "Подготовка запроса";
+  if (percent < 35) return "Анализ точки изменения";
+  if (percent < 58) return "Построение последствий";
+  if (percent < 78) return "Сбор временной линии";
+  if (percent < 94) return "Форматирование ответа";
+  if (percent < 100) return "Ожидание Gemini";
+  return "Готово";
+}
+
+function setProgress(percent, text = "") {
+  const value = Math.max(0, Math.min(100, Math.round(percent)));
+
+  progressPercent.textContent = `${value}%`;
+  progressFill.style.width = `${value}%`;
+  progressStage.textContent = progressStageByPercent(value);
+
+  if (text) loadingText.textContent = text;
+}
+
+function startProgress(data) {
+  stopProgress();
+
+  progressEstimate = calculateEstimate(data);
+  progressStartedAt = Date.now();
+
+  loadingTitle.textContent = "Строю ветку истории";
+  loadingText.textContent = "Считаю цепочку причин и последствий.";
+  progressTime.textContent = `Осталось: ${progressEstimate} сек.`;
+  setProgress(3);
+
+  progressTimer = setInterval(() => {
+    const elapsed = (Date.now() - progressStartedAt) / 1000;
+    const ratio = elapsed / progressEstimate;
+
+    let percent;
+
+    if (ratio <= 1) {
+      percent = 3 + ratio * 87;
+    } else {
+      const extra = Math.min(1, (elapsed - progressEstimate) / 18);
+      percent = 90 + extra * 8;
+    }
+
+    const left = Math.max(1, Math.round(progressEstimate - elapsed));
+
+    if (percent < 98) {
+      progressTime.textContent = ratio <= 1 ? `Осталось: ${left} сек.` : "Ответ почти готов";
+    }
+
+    setProgress(percent);
+  }, 350);
+}
+
+function finishProgress() {
+  stopProgress();
+  setProgress(100, "Ответ получен. Показываю результат.");
+  progressTime.textContent = "Готово";
+}
+
+function stopProgress() {
+  if (progressTimer) {
+    clearInterval(progressTimer);
+    progressTimer = null;
+  }
 }
 
 function infoCard(title, text, highlight = false) {
@@ -208,11 +281,9 @@ function renderAnalysis(result) {
 }
 
 function renderTimeline(result) {
-  const items = result.timeline || [];
-
   tabContent.innerHTML = `
     <div class="timeline">
-      ${items.map((item) => `
+      ${(result.timeline || []).map((item) => `
         <article class="timeline-card">
           <div class="timeline-year">${escapeHtml(item.year || "")}</div>
           <div class="pill">влияние: ${escapeHtml(item.impactLevel || "средний")}</div>
@@ -225,8 +296,6 @@ function renderTimeline(result) {
 }
 
 function renderMap(result) {
-  const branches = result.causeEffectMap || [];
-
   tabContent.innerHTML = `
     <div class="section-grid">
       <article class="map-card map-center">
@@ -234,7 +303,7 @@ function renderMap(result) {
         <p>${escapeHtml(result.changedPoint || result.shortSummary)}</p>
       </article>
 
-      ${branches.map((branch) => `
+      ${(result.causeEffectMap || []).map((branch) => `
         <article class="map-card">
           <h3>${escapeHtml(branch.branch || "Ветвь")}</h3>
           <ul class="map-items">
@@ -372,8 +441,8 @@ function renderExport(result) {
   `;
 
   $("#copyFull")?.addEventListener("click", () => copyText(resultToText(result)));
-  $("#downloadTxt")?.addEventListener("click", () => downloadFile("history-otherwise.txt", resultToText(result), "text/plain;charset=utf-8"));
-  $("#downloadJson")?.addEventListener("click", () => downloadFile("history-otherwise.json", JSON.stringify(result, null, 2), "application/json;charset=utf-8"));
+  $("#downloadTxt")?.addEventListener("click", () => downloadFile("inaya-history.txt", resultToText(result), "text/plain;charset=utf-8"));
+  $("#downloadJson")?.addEventListener("click", () => downloadFile("inaya-history.json", JSON.stringify(result, null, 2), "application/json;charset=utf-8"));
   $("#copyShort")?.addEventListener("click", () => copyText(`${result.title}\n\n${result.shortSummary}`));
   $("#copyVideo")?.addEventListener("click", () => copyText(result.videoScriptVersion || result.shortSummary, "Версия для YouTube скопирована"));
   $("#copyVoice")?.addEventListener("click", () => copyText(result.voiceoverVersion || result.shortSummary, "Версия для озвучки скопирована"));
@@ -414,7 +483,7 @@ function showResult(result) {
 function showToast(message) {
   toast.textContent = message;
   toast.classList.remove("hidden");
-  setTimeout(() => toast.classList.add("hidden"), 1500);
+  setTimeout(() => toast.classList.add("hidden"), 1800);
 }
 
 function showError(message) {
@@ -429,7 +498,7 @@ function hideError() {
 
 function getHistory() {
   try {
-    return JSON.parse(localStorage.getItem("historyOtherwiseV2") || "[]");
+    return JSON.parse(localStorage.getItem("inayaHistoryV4") || "[]");
   } catch {
     return [];
   }
@@ -438,13 +507,13 @@ function getHistory() {
 function saveHistory(item) {
   const items = getHistory();
   items.unshift(item);
-  localStorage.setItem("historyOtherwiseV2", JSON.stringify(items.slice(0, 10)));
+  localStorage.setItem("inayaHistoryV4", JSON.stringify(items.slice(0, 10)));
   renderHistory();
 }
 
 function deleteHistory(id) {
   const items = getHistory().filter((item) => item.id !== id);
-  localStorage.setItem("historyOtherwiseV2", JSON.stringify(items));
+  localStorage.setItem("inayaHistoryV4", JSON.stringify(items));
   renderHistory();
 }
 
@@ -507,6 +576,7 @@ form.addEventListener("submit", async (event) => {
   submitBtn.disabled = true;
   loadingCard.classList.remove("hidden");
   resultShell.classList.add("hidden");
+  startProgress(data);
 
   try {
     const response = await fetch("/api/generate", {
@@ -525,7 +595,13 @@ form.addEventListener("submit", async (event) => {
 
     const result = normalizeResult(payload, data);
 
-    showResult(result);
+    finishProgress();
+
+    setTimeout(() => {
+      loadingCard.classList.add("hidden");
+      showResult(result);
+    }, 450);
+
     saveHistory({
       id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
       createdAt: new Date().toISOString(),
@@ -533,9 +609,10 @@ form.addEventListener("submit", async (event) => {
       result
     });
   } catch (error) {
+    stopProgress();
+    loadingCard.classList.add("hidden");
     showError(error.message || "Не удалось получить ответ.");
   } finally {
-    loadingCard.classList.add("hidden");
     submitBtn.disabled = false;
   }
 });
@@ -555,7 +632,7 @@ historyToggle.addEventListener("click", () => {
 });
 
 clearHistory.addEventListener("click", () => {
-  localStorage.removeItem("historyOtherwiseV2");
+  localStorage.removeItem("inayaHistoryV4");
   renderHistory();
   showToast("История очищена");
 });

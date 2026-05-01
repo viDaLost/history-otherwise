@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>История Иначе</title>
+  <title>Иная История</title>
   <meta name="description" content="Мобильный симулятор альтернативной истории на Gemini API." />
   <meta name="theme-color" content="#07111f" />
   <link rel="stylesheet" href="/styles.css" />
@@ -15,7 +15,7 @@
     <header class="topbar">
       <div>
         <span class="mini-label">AI history lab</span>
-        <h1>История Иначе</h1>
+        <h1>Иная История</h1>
       </div>
       <button class="icon-btn" id="historyToggle" type="button" aria-label="История">↻</button>
     </header>
@@ -32,24 +32,24 @@
       <form id="historyForm" class="form">
         <div class="field">
           <label for="eventTitle">Событие</label>
-          <input id="eventTitle" name="eventTitle" type="text" placeholder="Октябрьская революция" autocomplete="off" />
+          <input id="eventTitle" name="eventTitle" type="text" placeholder="Вторая мировая" autocomplete="off" />
         </div>
 
         <div class="quick-grid">
           <div class="field">
             <label for="region">Регион</label>
-            <input id="region" name="region" type="text" placeholder="Россия" autocomplete="off" />
+            <input id="region" name="region" type="text" placeholder="Европа" autocomplete="off" />
           </div>
 
           <div class="field">
             <label for="period">Период</label>
-            <input id="period" name="period" type="text" placeholder="1917 год" autocomplete="off" />
+            <input id="period" name="period" type="text" placeholder="1939 год" autocomplete="off" />
           </div>
         </div>
 
         <div class="field">
           <label for="change">Главное изменение</label>
-          <textarea id="change" name="change" rows="4" placeholder="Революция не удалась, большевики потеряли влияние, а Временное правительство удержало власть."></textarea>
+          <textarea id="change" name="change" rows="4" placeholder="Вторая мировая война не началась, потому что Германия столкнулась с внутренним военным заговором."></textarea>
         </div>
 
         <details class="advanced">
@@ -84,10 +84,23 @@
     </section>
 
     <section class="loading-card hidden" id="loadingCard">
-      <div class="loader"></div>
-      <div>
-        <h3>Строю ветку истории</h3>
-        <p>Обычно это занимает несколько секунд. Короткий ввод даёт более быстрый ответ.</p>
+      <div class="progress-shell">
+        <div class="progress-top">
+          <div>
+            <h3 id="loadingTitle">Строю ветку истории</h3>
+            <p id="loadingText">Подготовка запроса.</p>
+          </div>
+          <strong id="progressPercent">0%</strong>
+        </div>
+
+        <div class="progress-track">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+
+        <div class="progress-meta">
+          <span id="progressStage">Старт</span>
+          <span id="progressTime">Осталось: 20 сек.</span>
+        </div>
       </div>
     </section>
 

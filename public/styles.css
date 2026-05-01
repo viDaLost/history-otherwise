@@ -272,31 +272,64 @@ select:focus {
   padding: 16px;
 }
 
-.loading-card {
-  display: flex;
-  align-items: center;
+.progress-shell {
+  width: 100%;
+  display: grid;
   gap: 14px;
 }
 
-.loading-card h3,
-.loading-card p {
-  margin-bottom: 0;
+.progress-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
 }
 
-.loader {
-  width: 42px;
-  height: 42px;
-  border: 4px solid rgba(66, 183, 255, 0.16);
-  border-top-color: var(--blue);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+.progress-top h3 {
+  margin-bottom: 5px;
+}
+
+.progress-top p {
+  margin-bottom: 0;
+  font-size: 15px;
+}
+
+#progressPercent {
+  color: var(--gold);
+  font-size: 32px;
+  line-height: 1;
   flex: 0 0 auto;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+.progress-track {
+  height: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(116, 184, 255, 0.28);
+  border-radius: 999px;
+  background: rgba(3, 9, 18, 0.72);
+}
+
+.progress-fill {
+  width: 0%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--blue), var(--blue2), var(--gold));
+  box-shadow: 0 0 24px rgba(66, 183, 255, 0.34);
+  transition: width 0.35s ease;
+}
+
+.progress-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+#progressStage {
+  color: #dff2ff;
+  font-weight: 850;
 }
 
 .error-card {
@@ -405,7 +438,8 @@ select:focus {
   background: rgba(3, 10, 21, 0.46);
 }
 
-.info-card.highlight {
+.info-card.highlight,
+.map-center {
   border-color: var(--line2);
   background: linear-gradient(180deg, rgba(255, 208, 109, 0.12), rgba(3, 10, 21, 0.48));
 }
@@ -504,12 +538,6 @@ select:focus {
   background: rgba(66, 183, 255, 0.08);
   font-size: 13px;
   font-weight: 900;
-}
-
-.map-center {
-  border-color: var(--line2);
-  text-align: center;
-  background: linear-gradient(180deg, rgba(255, 208, 109, 0.14), rgba(3, 10, 21, 0.5));
 }
 
 .map-items {
@@ -625,5 +653,13 @@ select:focus {
   .score-ring {
     width: 96px;
     height: 96px;
+  }
+
+  .progress-top {
+    display: grid;
+  }
+
+  #progressPercent {
+    font-size: 36px;
   }
 }
