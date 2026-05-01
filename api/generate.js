@@ -151,11 +151,11 @@ export default async function handler(req, res) {
     const prompt = buildPrompt(body);
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.5-flash-lite",
       contents: prompt,
       config: {
         temperature: 0.75,
-        maxOutputTokens: 8192
+        maxOutputTokens: 4096
       }
     });
 
