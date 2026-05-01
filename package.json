@@ -1,11 +1,15 @@
 {
-“name”: “history-otherwise”,
-“version”: “1.0.0”,
-“private”: true,
-“type”: “module”,
-“scripts”: {
-“dev”: “vercel dev”
-},
-“dependencies”: {
-“@google/genai”: “latest”
+  "name": "history-otherwise-gemini",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "@google/genai": "latest"
+  },
+  "engines": {
+    "node": ">=18"
+  }
 }
