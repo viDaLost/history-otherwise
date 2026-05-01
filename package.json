@@ -1,14 +1,13 @@
 {
-  "name": "history-otherwise-with-images",
-  "version": "3.0.0",
+  "name": "history-otherwise-with-gemini-images",
+  "version": "3.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vercel dev"
   },
   "dependencies": {
-    "@google/genai": "latest",
-    "openai": "latest"
+    "@google/genai": "latest"
   },
   "engines": {
     "node": ">=18"
