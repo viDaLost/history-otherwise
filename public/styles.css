@@ -398,16 +398,14 @@ select:focus {
 .timeline-card,
 .map-card,
 .export-card,
-.history-item,
-.image-card {
+.history-item {
   border: 1px solid var(--line);
   border-radius: 22px;
   padding: 16px;
   background: rgba(3, 10, 21, 0.46);
 }
 
-.info-card.highlight,
-.map-center {
+.info-card.highlight {
   border-color: var(--line2);
   background: linear-gradient(180deg, rgba(255, 208, 109, 0.12), rgba(3, 10, 21, 0.48));
 }
@@ -415,8 +413,7 @@ select:focus {
 .info-card h3,
 .timeline-card h3,
 .map-card h3,
-.export-card h3,
-.image-card h3 {
+.export-card h3 {
   margin: 0 0 10px;
   color: var(--gold);
 }
@@ -424,8 +421,7 @@ select:focus {
 .info-card p,
 .timeline-card p,
 .map-card p,
-.export-card p,
-.image-card p {
+.export-card p {
   margin-bottom: 0;
   font-size: 16px;
 }
@@ -510,6 +506,12 @@ select:focus {
   font-weight: 900;
 }
 
+.map-center {
+  border-color: var(--line2);
+  text-align: center;
+  background: linear-gradient(180deg, rgba(255, 208, 109, 0.14), rgba(3, 10, 21, 0.5));
+}
+
 .map-items {
   margin: 0;
   padding-left: 20px;
@@ -519,30 +521,6 @@ select:focus {
 
 .map-items li {
   margin: 7px 0;
-}
-
-.image-frame {
-  overflow: hidden;
-  border-radius: 20px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.03);
-  aspect-ratio: 1 / 1;
-}
-
-.image-frame img {
-  width: 100%;
-  height: 100%;
-  display: block;
-  object-fit: cover;
-}
-
-.image-placeholder {
-  display: grid;
-  place-items: center;
-  height: 100%;
-  padding: 20px;
-  text-align: center;
-  color: var(--muted);
 }
 
 .export-actions {

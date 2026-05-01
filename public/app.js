@@ -3,8 +3,6 @@ const $ = (selector) => document.querySelector(selector);
 const form = $("#historyForm");
 const submitBtn = $("#submitBtn");
 const loadingCard = $("#loadingCard");
-const loadingTitle = $("#loadingTitle");
-const loadingText = $("#loadingText");
 const errorBox = $("#errorBox");
 const resultShell = $("#resultShell");
 const resultTitle = $("#resultTitle");
@@ -20,7 +18,6 @@ const fillExample = $("#fillExample");
 const toast = $("#toast");
 
 let currentResult = null;
-let currentInput = null;
 let activeTab = "overview";
 
 const examples = [
@@ -80,7 +77,20 @@ function splitToBullets(text) {
 
 function normalizeResult(payload, input = {}) {
   let raw = payload?.result && typeof payload.result === "object" ? payload.result : payload;
+
+  if (typeof raw === "string") {
+    raw = {
+      title: input.eventTitle || "Альтернативная история",
+      shortSummary: raw,
+      resultText: raw
+    };
+  }
+
   raw = raw || {};
+
+  const after5 = pick(raw, ["after5Years", "fiveYears", "resultAfter5Years"]);
+  const after20 = pick(raw, ["after20Years", "twentyYears", "resultAfter20Years"]);
+  const after50 = pick(raw, ["after50Years", "fiftyYears", "resultAfter50Years"]);
 
   const result = {
     title: toText(pick(raw, ["title", "scenarioTitle", "name"])) || "Альтернативная история",
@@ -88,18 +98,18 @@ function normalizeResult(payload, input = {}) {
     realHistoryContext: toText(pick(raw, ["realHistoryContext", "context", "historicalContext"])),
     changedPoint: toText(pick(raw, ["changedPoint", "change", "mainChange"])) || input.change || "",
     firstConsequences: toText(pick(raw, ["firstConsequences", "immediateConsequences", "firstEffects"])),
-    causeChain: toText(pick(raw, ["causeChain", "chainOfConsequences", "causeEffectChain"])),
-    politics: toText(pick(raw, ["politics", "politicalConsequences"])),
-    economy: toText(pick(raw, ["economy", "economicConsequences"])),
-    military: toText(pick(raw, ["military", "militaryConsequences", "wars"])),
-    technology: toText(pick(raw, ["technology", "technologyConsequences", "tech"])),
-    culture: toText(pick(raw, ["culture", "culturalConsequences"])),
-    society: toText(pick(raw, ["society", "socialConsequences"])),
+    causeChain: toText(pick(raw, ["causeChain", "chainOfConsequences", "causeEffectChain", "consequencesChain"])),
+    politics: toText(pick(raw, ["politics", "politicalConsequences", "politicalImpact"])),
+    economy: toText(pick(raw, ["economy", "economicConsequences", "economicImpact"])),
+    military: toText(pick(raw, ["military", "militaryConsequences", "warConsequences", "wars"])),
+    technology: toText(pick(raw, ["technology", "technologyConsequences", "technologicalConsequences", "tech"])),
+    culture: toText(pick(raw, ["culture", "culturalConsequences", "culturalImpact"])),
+    society: toText(pick(raw, ["society", "socialConsequences", "socialImpact"])),
     bordersAndAlliances: toText(pick(raw, ["bordersAndAlliances", "alliances", "borders"])),
     ordinaryPeopleLife: toText(pick(raw, ["ordinaryPeopleLife", "peopleLife", "dailyLife"])),
-    after5Years: toText(pick(raw, ["after5Years", "fiveYears"])),
-    after20Years: toText(pick(raw, ["after20Years", "twentyYears"])),
-    after50Years: toText(pick(raw, ["after50Years", "fiftyYears"])),
+    after5Years: toText(after5),
+    after20Years: toText(after20),
+    after50Years: toText(after50),
     modernWorldResult: toText(pick(raw, ["modernWorldResult", "modernWorld", "currentWorld"])),
     probabilityScore: Number(pick(raw, ["probabilityScore", "plausibility", "score"])) || 50,
     risks: toText(pick(raw, ["risks", "scenarioRisks", "weakPoints"])),
@@ -107,10 +117,7 @@ function normalizeResult(payload, input = {}) {
     videoScriptVersion: toText(pick(raw, ["videoScriptVersion", "youtubeVersion", "videoVersion"])),
     voiceoverVersion: toText(pick(raw, ["voiceoverVersion", "voiceVersion", "narration"])),
     timeline: Array.isArray(raw.timeline) ? raw.timeline : [],
-    causeEffectMap: Array.isArray(raw.causeEffectMap) ? raw.causeEffectMap : [],
-    illustration: raw.illustration || null,
-    illustrationPrompt: raw.illustrationPrompt || "",
-    illustrationError: raw.illustrationError || ""
+    causeEffectMap: Array.isArray(raw.causeEffectMap) ? raw.causeEffectMap : []
   };
 
   result.probabilityScore = Math.max(1, Math.min(100, Math.round(result.probabilityScore)));
@@ -201,9 +208,11 @@ function renderAnalysis(result) {
 }
 
 function renderTimeline(result) {
+  const items = result.timeline || [];
+
   tabContent.innerHTML = `
     <div class="timeline">
-      ${(result.timeline || []).map((item) => `
+      ${items.map((item) => `
         <article class="timeline-card">
           <div class="timeline-year">${escapeHtml(item.year || "")}</div>
           <div class="pill">влияние: ${escapeHtml(item.impactLevel || "средний")}</div>
@@ -216,6 +225,8 @@ function renderTimeline(result) {
 }
 
 function renderMap(result) {
+  const branches = result.causeEffectMap || [];
+
   tabContent.innerHTML = `
     <div class="section-grid">
       <article class="map-card map-center">
@@ -223,7 +234,7 @@ function renderMap(result) {
         <p>${escapeHtml(result.changedPoint || result.shortSummary)}</p>
       </article>
 
-      ${(result.causeEffectMap || []).map((branch) => `
+      ${branches.map((branch) => `
         <article class="map-card">
           <h3>${escapeHtml(branch.branch || "Ветвь")}</h3>
           <ul class="map-items">
@@ -233,62 +244,6 @@ function renderMap(result) {
       `).join("")}
     </div>
   `;
-}
-
-async function retryImage() {
-  if (!currentResult || !currentInput) return;
-
-  loadingCard.classList.remove("hidden");
-  loadingTitle.textContent = "Повторяю генерацию иллюстрации";
-  loadingText.textContent = "Пробую получить изображение через Gemini.";
-
-  try {
-    const imageData = await generateIllustration(currentInput, currentResult);
-    currentResult.illustration = imageData.illustration;
-    currentResult.illustrationPrompt = imageData.illustrationPrompt;
-    currentResult.illustrationError = "";
-    renderImage(currentResult);
-    showToast("Иллюстрация готова");
-  } catch (error) {
-    currentResult.illustrationError = error.message || "Иллюстрация не создалась.";
-    renderImage(currentResult);
-  } finally {
-    loadingCard.classList.add("hidden");
-  }
-}
-
-function renderImage(result) {
-  let imageHtml = "";
-
-  if (result.illustration) {
-    imageHtml = `<div class="image-frame"><img src="${result.illustration}" alt="Иллюстрация альтернативной истории" /></div>`;
-  } else {
-    const message = result.illustrationError
-      ? `Иллюстрация не создалась. Ошибка: ${result.illustrationError}`
-      : "Иллюстрация пока не создана.";
-
-    imageHtml = `
-      <div class="image-frame">
-        <div class="image-placeholder">${escapeHtml(message)}</div>
-      </div>
-      <button class="action-btn primary" id="retryImageBtn" type="button">Повторить генерацию картинки</button>
-    `;
-  }
-
-  tabContent.innerHTML = `
-    <div class="section-grid">
-      <article class="image-card">
-        <h3>Иллюстрация сценария</h3>
-        <p>Картинка показывает общее положение, атмосферу и последствия того изменения, которое ты внёс в историю.</p>
-      </article>
-
-      ${imageHtml}
-
-      ${infoCard("Что показывает картинка", "Иллюстрация опирается на название сценария, ключевое изменение, первые последствия и современный мир в этой версии истории.")}
-    </div>
-  `;
-
-  $("#retryImageBtn")?.addEventListener("click", retryImage);
 }
 
 function resultToText(result) {
@@ -418,11 +373,7 @@ function renderExport(result) {
 
   $("#copyFull")?.addEventListener("click", () => copyText(resultToText(result)));
   $("#downloadTxt")?.addEventListener("click", () => downloadFile("history-otherwise.txt", resultToText(result), "text/plain;charset=utf-8"));
-  $("#downloadJson")?.addEventListener("click", () => {
-    const clone = { ...result };
-    delete clone.illustration;
-    downloadFile("history-otherwise.json", JSON.stringify(clone, null, 2), "application/json;charset=utf-8");
-  });
+  $("#downloadJson")?.addEventListener("click", () => downloadFile("history-otherwise.json", JSON.stringify(result, null, 2), "application/json;charset=utf-8"));
   $("#copyShort")?.addEventListener("click", () => copyText(`${result.title}\n\n${result.shortSummary}`));
   $("#copyVideo")?.addEventListener("click", () => copyText(result.videoScriptVersion || result.shortSummary, "Версия для YouTube скопирована"));
   $("#copyVoice")?.addEventListener("click", () => copyText(result.voiceoverVersion || result.shortSummary, "Версия для озвучки скопирована"));
@@ -435,7 +386,6 @@ function renderCurrentTab() {
   if (activeTab === "analysis") renderAnalysis(currentResult);
   if (activeTab === "timeline") renderTimeline(currentResult);
   if (activeTab === "map") renderMap(currentResult);
-  if (activeTab === "image") renderImage(currentResult);
   if (activeTab === "export") renderExport(currentResult);
 }
 
@@ -464,7 +414,7 @@ function showResult(result) {
 function showToast(message) {
   toast.textContent = message;
   toast.classList.remove("hidden");
-  setTimeout(() => toast.classList.add("hidden"), 1800);
+  setTimeout(() => toast.classList.add("hidden"), 1500);
 }
 
 function showError(message) {
@@ -479,7 +429,7 @@ function hideError() {
 
 function getHistory() {
   try {
-    return JSON.parse(localStorage.getItem("historyOtherwiseV3") || "[]");
+    return JSON.parse(localStorage.getItem("historyOtherwiseV2") || "[]");
   } catch {
     return [];
   }
@@ -487,18 +437,14 @@ function getHistory() {
 
 function saveHistory(item) {
   const items = getHistory();
-  const safeItem = JSON.parse(JSON.stringify(item));
-  if (safeItem.result) {
-    delete safeItem.result.illustration;
-  }
-  items.unshift(safeItem);
-  localStorage.setItem("historyOtherwiseV3", JSON.stringify(items.slice(0, 10)));
+  items.unshift(item);
+  localStorage.setItem("historyOtherwiseV2", JSON.stringify(items.slice(0, 10)));
   renderHistory();
 }
 
 function deleteHistory(id) {
   const items = getHistory().filter((item) => item.id !== id);
-  localStorage.setItem("historyOtherwiseV3", JSON.stringify(items));
+  localStorage.setItem("historyOtherwiseV2", JSON.stringify(items));
   renderHistory();
 }
 
@@ -525,7 +471,6 @@ function renderHistory() {
     button.addEventListener("click", () => {
       const item = getHistory().find((entry) => entry.id === button.dataset.open);
       if (!item) return;
-      currentInput = item.input || null;
       showResult(item.result);
       historyPanel.classList.add("hidden");
     });
@@ -547,38 +492,10 @@ function collectInput() {
   };
 }
 
-async function generateIllustration(input, result) {
-  loadingTitle.textContent = "Создаю иллюстрацию";
-  loadingText.textContent = "Пробую получить изображение через Gemini.";
-
-  const response = await fetch("/api/generate-image", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      ...input,
-      ...result
-    })
-  });
-
-  const payload = await response.json();
-
-  if (!response.ok) {
-    throw new Error(payload.error || "Не удалось создать иллюстрацию.");
-  }
-
-  return {
-    illustration: payload.imageUrl || "",
-    illustrationPrompt: payload.imagePrompt || ""
-  };
-}
-
 form.addEventListener("submit", async (event) => {
   event.preventDefault();
 
   const data = collectInput();
-  currentInput = data;
 
   hideError();
 
@@ -590,8 +507,6 @@ form.addEventListener("submit", async (event) => {
   submitBtn.disabled = true;
   loadingCard.classList.remove("hidden");
   resultShell.classList.add("hidden");
-  loadingTitle.textContent = "Строю ветку истории";
-  loadingText.textContent = "Сначала генерирую анализ и временную линию.";
 
   try {
     const response = await fetch("/api/generate", {
@@ -609,19 +524,6 @@ form.addEventListener("submit", async (event) => {
     }
 
     const result = normalizeResult(payload, data);
-
-    try {
-      const imageData = await generateIllustration(data, result);
-      result.illustration = imageData.illustration;
-      result.illustrationPrompt = imageData.illustrationPrompt;
-      result.illustrationError = "";
-      showToast("Текст и иллюстрация готовы");
-    } catch (imageError) {
-      result.illustration = "";
-      result.illustrationPrompt = "";
-      result.illustrationError = imageError.message || "Иллюстрация не создалась.";
-      showToast("Текст готов. Иллюстрация не создалась.");
-    }
 
     showResult(result);
     saveHistory({
@@ -653,7 +555,7 @@ historyToggle.addEventListener("click", () => {
 });
 
 clearHistory.addEventListener("click", () => {
-  localStorage.removeItem("historyOtherwiseV3");
+  localStorage.removeItem("historyOtherwiseV2");
   renderHistory();
   showToast("История очищена");
 });
